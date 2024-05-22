@@ -8,7 +8,7 @@ TL;DR: Transformer model for motion prediction that incorporates two types of re
 ### Overview
 ![RedMotion](figures/red_motion.png "RedMotion")
 
-**RedMotion.** Our model consists of two encoders. The trajectory encoder generates an embedding for the past trajectory of the current agent. The road environment encoder generates sets of local and global road environment embeddings as context. We use two redundancy reduction mechanisms, (a) and (b), to learn rich representations of road environments. All embeddings are fused via cross-attention to yield trajectory proposals per agent.
+**RedMotion.** Our model consists of two encoders. The trajectory encoder generates an embedding for the past trajectory of the current agent. The road environment encoder generates sets of local and global road environment embeddings as context. We use two redundancy reduction mechanisms, (a) architecture-induced and (b) self-supervised, to learn rich representations of road environments. All embeddings are fused via cross-attention to yield trajectory proposals per agent.
 
 ### Getting started
 Coming soon!
