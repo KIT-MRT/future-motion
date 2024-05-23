@@ -1,3 +1,0 @@
-[submodule "src/external_submodules/HPTR"]
-	path = src/external_submodules/HPTR
-	url = https://github.com/zhejz/HPTR
