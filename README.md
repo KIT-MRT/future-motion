@@ -1,6 +1,13 @@
 # FutureMotion
 Common repo for our ongoing research on motion forecasting in self-driving vehicles.
 
+## Setup
+Init external submodules with:
+```
+git submodule update --init --recursive
+```
+Prepare Waymo and Argoverse datasets and init a conda env by following the instructions in `src/external_submodules/hptr/README.md`.
+
 ## RedMotion: Motion Prediction via Redundancy Reduction
 TL;DR: Transformer model for motion prediction that incorporates two types of redundancy reduction.
 
