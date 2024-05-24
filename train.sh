@@ -9,7 +9,7 @@ export CUDA_VISIBLE_DEVICES=3
 export HYDRA_FULL_ERROR=1
 
 run () {
-    python -u src/train.py \
+    python -u src/train_and_eval.py \
     trainer=av2 \
     model=ac_red_motion \
     datamodule.batch_size=28 \
