@@ -15,7 +15,7 @@ Prepare Waymo Open Motion and Argoverse 2 Forecasting datasets by following the 
 
 ## Motion forecasting models
 <details>
-<summary><big><b>RedMotion: Motion Prediction via Redundancy Reduction</b></big></summary>
+<summary><font size="5"><b>RedMotion: Motion Prediction via Redundancy Reduction</b></font></summary>
 
 <big><b>TL;DR:</b></big> Transformer model for motion prediction that incorporates two types of redundancy reduction.
 
