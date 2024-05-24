@@ -10,7 +10,7 @@ export HYDRA_FULL_ERROR=1
 
 run() {
     python -u src/train_and_eval.py \
-    trainer=av2 \
+    trainer=womd \
     model="$1" \
     datamodule.batch_size=$BATCH_SIZE \
     datamodule=h5_womd \
