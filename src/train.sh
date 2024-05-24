@@ -1,6 +1,6 @@
 DATASET_DIR="PATH_TO_DATASET" 
-WAND_ENTITY="WANDB_USER_OR_GROUP"
-WAND_PROJECT="WAND_PROJECT"
+WANDB_ENTITY="WANDB_USER_OR_GROUP"
+WANDB_PROJECT="WAND_PROJECT"
 HYDRA_RUN_DIR="PATH_TO_HYDRALOGS"
 
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
@@ -15,8 +15,8 @@ run () {
     datamodule.batch_size=28 \
     datamodule=h5_womd \
     loggers.wandb.name='train_red_motion_${now:%Y-%m-%d-%H-%M-%S}' \
-    loggers.wandb.project=$WAND_PROJECT \
-    loggers.wandb.entity=$WAND_ENTITY \
+    loggers.wandb.project=$WANDB_PROJECT \
+    loggers.wandb.entity=$WANDB_ENTITY \
     +logger.wandb.offline=True \
     datamodule.data_dir=$DATASET_DIR \
     hydra.run.dir='${HYDRA_RUNDIR}/${now:%Y-%m-%d}/${now:%H-%M-%S}'
