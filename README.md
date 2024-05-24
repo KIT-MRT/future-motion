@@ -1,4 +1,6 @@
 # FutureMotion
+![PyTorch Lightning](https://img.shields.io/badge/pytorch-lightning-blue.svg?logo=PyTorch%20Lightning) ![Black](https://img.shields.io/badge/code%20style-black-000000.svg) ![Weights & Biases](https://raw.githubusercontent.com/wandb/assets/main/wandb-github-badge-gradient.svg)
+
 Common repo for our ongoing research on motion forecasting in self-driving vehicles.
 
 ## Setup
