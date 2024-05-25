@@ -8,7 +8,7 @@ Clone this repo, afterwards init external submodules with:
 ```bash
 git submodule update --init --recursive
 ```
-Create conda environment named "future-motion" with:
+Create a conda environment named "future-motion" with:
 ```bash
 conda env create -f conda_env.yml
 ```
