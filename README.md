@@ -41,6 +41,18 @@ bash train.sh ac_red_motion
 ```
 For reference, this [wandb plot](https://wandb.ai/kit-mrt/red-motion-hptr/reports/waymo_pred-mean_average_precision-24-05-25-17-50-52---Vmlldzo4MDkyMjQ2?accessToken=j7a8pf4wvm9g6gvy95f88h0asdy57few6rw1jvv1qrf9jzuwpnirzv975id3pgxn) shows the validation mAP scores for the epochs 23 - 129 (default config, trained on 4 A6000 GPUs for ~100h).
 
+<big><b>Reference</b></big>
+```bibtex
+@article{
+    wagner2024redmotion,
+    title={RedMotion: Motion Prediction via Redundancy Reduction},
+    author={Royden Wagner and Omer Sahin Tas and Marvin Klemp and Carlos Fernandez and Christoph Stiller},
+    journal={Transactions on Machine Learning Research},
+    issn={2835-8856},
+    year={2024},
+}
+```
+
 </details>
 
 
