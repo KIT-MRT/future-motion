@@ -73,8 +73,6 @@ def main(config: DictConfig) -> None:
         if config.resume.resume_trainer and config.action == "fit":
             config.trainer.resume_from_checkpoint = ckpt_path
 
-    # from pytorch_lightning.plugins import DDPPlugin
-    # strategy = DDPPlugin(gradient_as_bucket_view=True)
     strategy = None
     if torch.cuda.device_count() > 1:
         strategy = "ddp"
@@ -89,8 +87,6 @@ def main(config: DictConfig) -> None:
     if config.action == "fit":
         trainer.fit(model=model, datamodule=datamodule)
     elif config.action == "validate":
-        # debug save model:
-        # torch.save(model, "/home/wagner/code/HPTR/logs/models/red_motion_tra_dec.pt")
         trainer.validate(model=model, datamodule=datamodule)
     elif config.action == "test":
         trainer.test(model=model, datamodule=datamodule)
