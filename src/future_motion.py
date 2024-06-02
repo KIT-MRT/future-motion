@@ -9,6 +9,10 @@ from omegaconf import DictConfig
 from pytorch_lightning import LightningModule
 from typing import Dict, List, Tuple, Optional
 
+from models.modules.neural_collapse import OnlineLinearClassifier
+from models.metrics.representation_eval import std_of_l2_normalized
+from data.lang_labels import agent_dict, direction_dict, speed_dict, acceleration_dict
+
 
 class FutureMotion(LightningModule):
     def __init__(
@@ -30,6 +34,7 @@ class FutureMotion(LightningModule):
         sub_av2: DictConfig,
         interactive_challenge: bool = False,
         wb_artifact: Optional[str] = None,
+        measure_neural_collapse: bool = False,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
@@ -67,6 +72,24 @@ class FutureMotion(LightningModule):
             n_agent=data_size["agent/valid"][-1],
         )
 
+        if measure_neural_collapse:
+            n_all_classes = len(agent_dict) * len(direction_dict) * len(speed_dict) * len(acceleration_dict)
+
+            # per hidden layer
+            self.online_classifiers_motion = nn.ModuleList()
+            self.online_classifiers_direction = nn.ModuleList()
+            self.online_classifiers_agent = nn.ModuleList()
+            self.online_classifiers_speed = nn.ModuleList()
+            self.online_classifiers_acceleration = nn.ModuleList()
+
+            for idx_hidden in range(3):
+                self.online_classifiers_direction.append(OnlineLinearClassifier(feature_dim=self.model.hidden_dim, num_classes=len(direction_dict), topk=(1, 2), log_prefix=f"direction_{idx_hidden}"))
+                self.online_classifiers_agent.append(OnlineLinearClassifier(feature_dim=self.model.hidden_dim, num_classes=len(agent_dict), topk=(1, 2), log_prefix=f"agent_{idx_hidden}"))
+                self.online_classifiers_speed.append(OnlineLinearClassifier(feature_dim=self.model.hidden_dim, num_classes=len(speed_dict), topk=(1, 2), log_prefix=f"speed_{idx_hidden}"))
+                self.online_classifiers_acceleration.append(OnlineLinearClassifier(feature_dim=self.model.hidden_dim, num_classes=len(acceleration_dict), topk=(1, 2), log_prefix=f"acceleration_{idx_hidden}"))
+                self.online_classifiers_motion.append(OnlineLinearClassifier(feature_dim=self.model.hidden_dim, num_classes=n_all_classes, log_prefix=f"motion_{idx_hidden}"))
+
+
     def training_step(self, batch: Dict[str, Tensor], batch_idx: int) -> Dict:
         with torch.no_grad():
             batch = self.pre_processing(batch)
@@ -74,7 +97,11 @@ class FutureMotion(LightningModule):
             gt_dict = {k.replace("/", "_"): v for k, v in batch.items() if "gt/" in k}
             pred_dict = {k.replace("/", "_"): v for k, v in batch.items() if "ref/" in k}
 
-        pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"] = self.model(**input_dict)
+        if self.hparams.measure_neural_collapse:
+            pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"], target_embs = self.model(**input_dict)
+        else:
+            pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"] = self.model(**input_dict)
+
         pred_dict = self.post_processing(pred_dict)
 
         metrics_dict = self.train_metric(**pred_dict, **gt_dict)
@@ -97,6 +124,45 @@ class FutureMotion(LightningModule):
                         {f"{self.train_metric.prefix}/{k}_d{i}": wandb.Histogram(np_histogram=h)}
                     )
 
+        if self.hparams.measure_neural_collapse:
+            # Online linear evaluation
+            linear_loss = 0.0
+
+            for idx_hidden in range(3):
+                cls_dir_loss, cls_dir_log = self.online_classifiers_direction[idx_hidden].training_step(
+                    (target_embs[idx_hidden][batch["input/agent_mask"]].mean(dim=1), batch["input/direction_labels"].to("cuda")[batch["input/agent_mask"]]), batch_idx
+                )
+
+                cls_agent_loss, cls_agent_log = self.online_classifiers_agent[idx_hidden].training_step(
+                    (target_embs[idx_hidden][batch["input/agent_mask"]].mean(dim=1), batch["input/agent_labels"].to("cuda")[batch["input/agent_mask"]]), batch_idx
+                )
+
+                cls_spd_loss, cls_spd_log = self.online_classifiers_speed[idx_hidden].training_step(
+                    (target_embs[idx_hidden][batch["input/agent_mask"]].mean(dim=1), batch["input/speed_labels"].to("cuda")[batch["input/agent_mask"]]), batch_idx
+                )
+                
+                cls_acc_loss, cls_acc_log = self.online_classifiers_acceleration[idx_hidden].training_step(
+                    (target_embs[idx_hidden][batch["input/agent_mask"]].mean(dim=1), batch["input/acceleration_labels"].to("cuda")[batch["input/agent_mask"]]), batch_idx
+                )
+
+                cls_mot_loss, cls_mot_log = self.online_classifiers_motion[idx_hidden].training_step(
+                    (target_embs[idx_hidden][batch["input/agent_mask"]].mean(dim=1), batch["input/motion_labels"].to("cuda")[batch["input/agent_mask"]]), batch_idx
+                )
+
+                self.log_dict(cls_dir_log, sync_dist=True)
+                self.log_dict(cls_agent_log, sync_dist=True)
+                self.log_dict(cls_spd_log, sync_dist=True)
+                self.log_dict(cls_acc_log, sync_dist=True)
+                
+                self.log_dict(cls_mot_log, sync_dist=True)
+
+                linear_loss += cls_dir_loss + cls_agent_loss + cls_mot_loss + cls_spd_loss + cls_acc_loss
+            
+                std_of_target_emb = std_of_l2_normalized(target_embs[idx_hidden][batch["input/agent_mask"]].mean(dim=1))
+                self.log(f"train/std_of_target_emb_{idx_hidden}", std_of_target_emb, sync_dist=True)
+            
+            return metrics_dict[f"{self.train_metric.prefix}/loss"] + linear_loss
+
         return metrics_dict[f"{self.train_metric.prefix}/loss"]
 
     def validation_step(self, batch: Dict[str, Tensor], batch_idx: int) -> Dict:
@@ -107,11 +173,48 @@ class FutureMotion(LightningModule):
             pred_dict = {k.replace("/", "_"): v for k, v in batch.items() if "ref/" in k}
 
         # ! model inference
-        pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"] = self.model(
-            inference_repeat_n=self.hparams.inference_repeat_n,
-            inference_cache_map=self.hparams.inference_cache_map,
-            **input_dict,
-        )
+        if self.hparams.measure_neural_collapse:
+            pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"], target_embs = self.model(
+                inference_repeat_n=self.hparams.inference_repeat_n,
+                inference_cache_map=self.hparams.inference_cache_map,
+                **input_dict,
+            )
+            for idx_hidden in range(3):
+                cls_dir_loss, cls_dir_log = self.online_classifiers_direction[idx_hidden].validation_step(
+                    (target_embs[idx_hidden][batch["input/agent_mask"]].mean(dim=1), batch["input/direction_labels"].to("cuda")[batch["input/agent_mask"]]), batch_idx
+                )
+
+                cls_agent_loss, cls_agent_log = self.online_classifiers_agent[idx_hidden].validation_step(
+                    (target_embs[idx_hidden][batch["input/agent_mask"]].mean(dim=1), batch["input/agent_labels"].to("cuda")[batch["input/agent_mask"]]), batch_idx
+                )
+
+                cls_spd_loss, cls_spd_log = self.online_classifiers_speed[idx_hidden].validation_step(
+                    (target_embs[idx_hidden][batch["input/agent_mask"]].mean(dim=1), batch["input/speed_labels"].to("cuda")[batch["input/agent_mask"]]), batch_idx
+                )
+                
+                cls_acc_loss, cls_acc_log = self.online_classifiers_acceleration[idx_hidden].validation_step(
+                    (target_embs[idx_hidden][batch["input/agent_mask"]].mean(dim=1), batch["input/acceleration_labels"].to("cuda")[batch["input/agent_mask"]]), batch_idx
+                )
+
+                cls_mot_loss, cls_mot_log = self.online_classifiers_motion[idx_hidden].validation_step(
+                    (target_embs[idx_hidden][batch["input/agent_mask"]].mean(dim=1), batch["input/motion_labels"].to("cuda")[batch["input/agent_mask"]]), batch_idx
+                )
+
+                self.log_dict(cls_dir_log, sync_dist=True)
+                self.log_dict(cls_agent_log, sync_dist=True)
+                self.log_dict(cls_spd_log, sync_dist=True)
+                self.log_dict(cls_acc_log, sync_dist=True)
+                
+                self.log_dict(cls_mot_log, sync_dist=True)
+            
+                std_of_target_emb = std_of_l2_normalized(target_embs[idx_hidden][batch["input/agent_mask"]].mean(dim=1))
+                self.log(f"val/std_of_target_emb_{idx_hidden}", std_of_target_emb, sync_dist=True)
+        else:
+            pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"] = self.model(
+                inference_repeat_n=self.hparams.inference_repeat_n,
+                inference_cache_map=self.hparams.inference_cache_map,
+                **input_dict,
+            )
         # print(pred_dict["pred"].shape)
 
         # ! post-processing
