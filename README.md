@@ -15,17 +15,16 @@ conda env create -f conda_env.yml
 
 Prepare Waymo Open Motion and Argoverse 2 Forecasting datasets by following the instructions in `src/external_submodules/hptr/README.md`.
 
-## Motion forecasting models
-<details>
-<summary><big><b>RedMotion: Motion Prediction via Redundancy Reduction</b></big></summary>
+## Methods
 
-TL;DR: Transformer model for motion prediction that incorporates two types of redundancy reduction.
-
-<big><b>Overview</b></big>
+### RedMotion: Motion Prediction via Redundancy Reduction 
 
 ![RedMotion](figures/red_motion.png "RedMotion")
 
-The RedMotion model consists of two encoders. The trajectory encoder generates an embedding for the past trajectory of the current agent. The road environment encoder generates sets of local and global road environment embeddings as context. We use two redundancy reduction mechanisms, (a) architecture-induced and (b) self-supervised, to learn rich representations of road environments. All embeddings are fused via cross-attention to yield trajectory proposals per agent.
+Our RedMotion model consists of two encoders. The trajectory encoder generates an embedding for the past trajectory of the current agent. The road environment encoder generates sets of local and global road environment embeddings as context. We use two redundancy reduction mechanisms, (a) architecture-induced and (b) self-supervised, to learn rich representations of road environments. All embeddings are fused via cross-attention to yield trajectory proposals per agent.
+
+<details>
+<summary><big><b>More details</b></big></summary>
 
 This repo contains the refactored implementation of RedMotion, the original implementation is available [here](https://github.com/kit-mrt/red-motion).
 
@@ -52,6 +51,19 @@ For reference, this [wandb plot](https://wandb.ai/kit-mrt/red-motion-hptr/report
     year={2024},
 }
 ```
+
+</details>
+
+### Words in Motion: Representation Engineering for Motion Forecasting
+
+![Words in Motion](figures/words_in_motion.png "Words in Motion")
+
+We use natural language to quantize motion features in an inter-pretable way. (b) The corresponding direction, speed, and acceleration classes are highlighted in blue. (c) To reverse engineer motion forecasting models, we measure the degree to which these features are embedded in their hidden states H with linear probes. Furthermore, we use our discrete motion features to fit control vectors V that allow for controlling motion forecasts during inference.
+
+<details>
+<summary><big><b>More details</b></big></summary>
+
+Soon to be released.
 
 </details>
 
