@@ -260,11 +260,31 @@ class IntraClassEncoder(nn.Module):
 
         self.measure_neural_collapse = kwargs.get("measure_neural_collapse")
 
+        control_vectors_target_emb = kwargs.get("control_vectors_target_emb", '')
+        
+        if control_vectors_target_emb:
+            self.control_vectors_target_emb = torch.load(control_vectors_target_emb)
+        else:
+            self.control_vectors_target_emb = None
+
+        self.control_temperature = kwargs.get("control_temperature", 0)
+        
         print(f"{self.use_current_agent_state = }")
         print(f"{self.forward_local_emb = }")
         print(f"{self.forward_red_emb = }")
         print(f"{self.forward_tl_emb = }")
         print(f"{self.measure_neural_collapse = }")
+        print(f"{control_vectors_target_emb = }")
+        print(f"{self.control_temperature = }")
+
+
+    def control_emb(self, emb, control_vector, temperature):
+        control_vector = repeat(control_vector, "hidden_dim -> b n_token hidden_dim", b=emb.shape[0], n_token=emb.shape[1])
+        
+        print(f"Controlling with tau = {temperature}")
+        emb = emb + control_vector * temperature
+
+        return emb
 
     def forward(
         self,
@@ -373,6 +393,9 @@ class IntraClassEncoder(nn.Module):
             )
             if self.measure_neural_collapse:
                 target_embs.append(target_emb)
+
+        if self.control_vectors_target_emb is not None:
+            target_emb = self.control_emb(target_emb, self.control_vectors_target_emb.to(target_emb.device), temperature=self.control_temperature) # 32 100
 
         env_emb = torch.cat([map_emb, other_emb], dim=1)
         local_valid = torch.cat([map_valid, other_valid], dim=1)
