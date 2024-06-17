@@ -41,6 +41,9 @@ class RedMotion(nn.Module):
         self.pl_aggr = pl_aggr
         self.pred_subsampling_rate = kwargs.get("pred_subsampling_rate", 1)
         decoder["mlp_head"]["n_step_future"] = decoder["mlp_head"]["n_step_future"] // self.pred_subsampling_rate
+        
+        self.hidden_dim = hidden_dim
+        self.measure_neural_collapse = kwargs.get("measure_neural_collapse", False)
 
         self.intra_class_encoder = IntraClassEncoder(
             hidden_dim=hidden_dim,
@@ -52,6 +55,7 @@ class RedMotion(nn.Module):
             use_current_tl=use_current_tl,
             n_step_hist=n_step_hist,
             n_pl_node=n_pl_node,
+            measure_neural_collapse=self.measure_neural_collapse,
             **intra_class_encoder,
         )
 
@@ -114,18 +118,33 @@ class RedMotion(nn.Module):
         """
         for _ in range(inference_repeat_n):
             valid = target_valid if self.pl_aggr else target_valid.any(-1)  # [n_scene, n_target]
-            emb, emb_invalid = self.intra_class_encoder(
-                target_valid=target_valid,
-                target_attr=target_attr,
-                other_valid=other_valid,
-                other_attr=other_attr,
-                map_valid=map_valid,
-                map_attr=map_attr,
-                tl_valid=tl_valid,
-                tl_attr=tl_attr,
-                valid=valid,
-                target_type=target_type,
-            )
+
+            if self.measure_neural_collapse:
+                emb, emb_invalid, target_embs = self.intra_class_encoder(
+                    target_valid=target_valid,
+                    target_attr=target_attr,
+                    other_valid=other_valid,
+                    other_attr=other_attr,
+                    map_valid=map_valid,
+                    map_attr=map_attr,
+                    tl_valid=tl_valid,
+                    tl_attr=tl_attr,
+                    valid=valid,
+                    target_type=target_type,
+                )
+            else:
+                emb, emb_invalid = self.intra_class_encoder(
+                    target_valid=target_valid,
+                    target_attr=target_attr,
+                    other_valid=other_valid,
+                    other_attr=other_attr,
+                    map_valid=map_valid,
+                    map_attr=map_attr,
+                    tl_valid=tl_valid,
+                    tl_attr=tl_attr,
+                    valid=valid,
+                    target_type=target_type,
+                )
 
             conf, pred = self.decoder(valid=valid, target_type=target_type, emb=emb, emb_invalid=emb_invalid)
 
@@ -145,7 +164,11 @@ class RedMotion(nn.Module):
 
         assert torch.isfinite(conf).all()
         assert torch.isfinite(pred).all()
-        return valid, conf, pred
+
+        if self.measure_neural_collapse:
+            return valid, conf, pred, target_embs
+        else:
+            return valid, conf, pred
 
 
 class IntraClassEncoder(nn.Module):
@@ -234,10 +257,34 @@ class IntraClassEncoder(nn.Module):
         self.forward_local_emb = kwargs.get("forward_local_emb")
         self.forward_red_emb = kwargs.get("forward_red_emb")
         self.forward_tl_emb = kwargs.get("forward_tl_emb")
+
+        self.measure_neural_collapse = kwargs.get("measure_neural_collapse")
+
+        control_vectors_target_emb = kwargs.get("control_vectors_target_emb", '')
+        
+        if control_vectors_target_emb:
+            self.control_vectors_target_emb = torch.load(control_vectors_target_emb)
+        else:
+            self.control_vectors_target_emb = None
+
+        self.control_temperature = kwargs.get("control_temperature", 0)
+        
         print(f"{self.use_current_agent_state = }")
         print(f"{self.forward_local_emb = }")
         print(f"{self.forward_red_emb = }")
         print(f"{self.forward_tl_emb = }")
+        print(f"{self.measure_neural_collapse = }")
+        print(f"{control_vectors_target_emb = }")
+        print(f"{self.control_temperature = }")
+
+
+    def control_emb(self, emb, control_vector, temperature):
+        control_vector = repeat(control_vector, "hidden_dim -> b n_token hidden_dim", b=emb.shape[0], n_token=emb.shape[1])
+        
+        print(f"Controlling with tau = {temperature}")
+        emb = emb + control_vector * temperature
+
+        return emb
 
     def forward(
         self,
@@ -336,10 +383,19 @@ class IntraClassEncoder(nn.Module):
             other_valid = other_valid.flatten(1, 2)  # [n_batch, n_other*(n_step_hist)]
         
         _target_invalid = ~target_valid
+
+        if self.measure_neural_collapse:
+            target_embs = []
+
         for mod in self.trajectory_encoder:
             target_emb, _ = mod(
                 src=target_emb, src_padding_mask=_target_invalid, tgt=target_emb, tgt_padding_mask=_target_invalid
             )
+            if self.measure_neural_collapse:
+                target_embs.append(target_emb)
+
+        if self.control_vectors_target_emb is not None:
+            target_emb = self.control_emb(target_emb, self.control_vectors_target_emb.to(target_emb.device), temperature=self.control_temperature) # 32 100
 
         env_emb = torch.cat([map_emb, other_emb], dim=1)
         local_valid = torch.cat([map_valid, other_valid], dim=1)
@@ -385,7 +441,10 @@ class IntraClassEncoder(nn.Module):
 
         emb_invalid = ~emb_valid
 
-        return emb, emb_invalid
+        if self.measure_neural_collapse:
+            return emb, emb_invalid, target_embs
+        else:
+            return emb, emb_invalid
 
 
 class ReductionDecoder(nn.Module):
