@@ -63,6 +63,16 @@ We use natural language to quantize motion features in an inter-pretable way. (b
 <details>
 <summary><big><b>More details</b></big></summary>
 
+<big><b>Gradio demos</b></big>
+
+Use [this Colab notebook](https://colab.research.google.com/drive/1ItY9YWQAmpfwc8KTRp6oY9e4uUWKxZrX?usp=sharing) to start Gradio demos for our speed control vectors.
+
+In contrast to the qualitative results in our paper, we show the motion forecasts for the focal agent and 8 other agents in a scene. 
+Press the submit button with the default temperature = 0 to visualize the default (non-controlled) forecasts, then change the temperature and resubmit to visualize the changes. 
+The example is from the Waymo Open dataset and shows motion forecasts for vehicles and a pedestrian (top center).
+
+<big><b>Training</b></big>
+
 Soon to be released.
 
 </details>
