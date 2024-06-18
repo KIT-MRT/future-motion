@@ -71,6 +71,12 @@ In contrast to the qualitative results in our paper, we show the motion forecast
 Press the submit button with the default temperature = 0 to visualize the default (non-controlled) forecasts, then change the temperature and resubmit to visualize the changes. 
 The example is from the Waymo Open dataset and shows motion forecasts for vehicles and a pedestrian (top center).
 
+For very low control temperatures (e.g, -100), almost all agents are becoming static.
+For very high control temperatures (e.g., 85), even the static (shown in grey) agents begin to move, and the pedestrian does not move faster anymore.
+We hypothesize that the model has learned a reasonable upper bound for the speed of a pedestrian.
+
+![Words in Motion Demo](figures/words_in_motion_gradio_demo.png "Words in Motion Demo")
+
 <big><b>Training</b></big>
 
 Soon to be released.
