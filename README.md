@@ -63,6 +63,22 @@ We use natural language to quantize motion features in an inter-pretable way. (b
 <details>
 <summary><big><b>More details</b></big></summary>
 
+<big><b>Gradio demos</b></big>
+
+Use [this Colab notebook](https://colab.research.google.com/drive/1ItY9YWQAmpfwc8KTRp6oY9e4uUWKxZrX?usp=sharing) to start Gradio demos for our speed control vectors.
+
+In contrast to the qualitative results in our paper, we show the motion forecasts for the focal agent and 8 other agents in a scene. 
+Press the submit button with the default temperature = 0 to visualize the default (non-controlled) forecasts, then change the temperature and resubmit to visualize the changes. 
+The example is from the Waymo Open dataset and shows motion forecasts for vehicles and a pedestrian (top center).
+
+For very low control temperatures (e.g, -100), almost all agents are becoming static.
+For very high control temperatures (e.g., 85), even the static (shown in grey) agents begin to move, and the pedestrian does not move faster anymore.
+We hypothesize that the model has learned a reasonable upper bound for the speed of a pedestrian.
+
+![Words in Motion Demo](figures/words_in_motion_gradio_demo.png "Words in Motion Demo")
+
+<big><b>Training</b></big>
+
 Soon to be released.
 
 </details>
