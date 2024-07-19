@@ -268,15 +268,6 @@ class IntraClassEncoder(nn.Module):
             self.control_vectors_target_emb = None
 
         self.control_temperature = kwargs.get("control_temperature", 0)
-        
-        print(f"{self.use_current_agent_state = }")
-        print(f"{self.forward_local_emb = }")
-        print(f"{self.forward_red_emb = }")
-        print(f"{self.forward_tl_emb = }")
-        print(f"{self.measure_neural_collapse = }")
-        print(f"{control_vectors_target_emb = }")
-        print(f"{self.control_temperature = }")
-
 
     def control_emb(self, emb, control_vector, temperature):
         control_vector = repeat(control_vector, "hidden_dim -> b n_token hidden_dim", b=emb.shape[0], n_token=emb.shape[1])
