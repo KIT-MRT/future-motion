@@ -12,7 +12,6 @@ log_every_n_steps: 200
 
 gradient_clip_val: 0.5
 track_grad_norm: 2
-gpus: -1
 precision: 32
 benchmark: False
 deterministic: False
@@ -21,3 +20,7 @@ detect_anomaly: False
 accumulate_grad_batches: 1
 resume_from_checkpoint: null
 enable_progress_bar: True
+
+num_nodes: 1
+accelerator: "gpu"
+devices: 4
