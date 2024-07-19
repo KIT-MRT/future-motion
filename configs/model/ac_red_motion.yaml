@@ -1,4 +1,4 @@
-_target_: external_submodules.hptr.src.pl_modules.waymo_motion.WaymoMotion
+_target_: future_motion.FutureMotion
 
 time_step_current: 10
 time_step_end: 90
@@ -6,6 +6,7 @@ n_video_batch: 3
 interactive_challenge: False
 inference_cache_map: False
 inference_repeat_n: 1
+plot_motion: False
 # pre_training_checkpoint: null
 
 train_metric:
@@ -59,6 +60,7 @@ post_processing:
     use_ade: True
     score_temperature: -1
     mpa_nms_thresh: [2.5, 1.0, 2.0] # veh, ped, cyc
+    mtr_nms_thresh: []
     gt_in_local: True
 
 model:
