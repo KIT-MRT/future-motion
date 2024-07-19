@@ -411,7 +411,7 @@ class IntraClassEncoder(nn.Module):
             valid=kwargs["valid"],
         )
 
-        red_valid = torch.ones(target_valid.shape[0], 100, device="cuda", dtype=torch.bool) # 100 = num of RED tokens
+        red_valid = torch.ones(target_valid.shape[0], 100, device=red_emb.device, dtype=torch.bool) # 100 = num of RED tokens
 
         n_batch = target_emb.shape[0]
         local_fusion_tokens = repeat(self.local_global_fusion_token, "d -> b 1 d", b=n_batch)
@@ -424,7 +424,7 @@ class IntraClassEncoder(nn.Module):
             fused_local_emb, fused_global_emb
         )
         fused_emb = torch.cat([fused_local_emb, fused_global_emb[:, 0][:, None, :]], dim=1)
-        fused_valid = torch.ones(n_batch, fused_emb.shape[1], device="cuda", dtype=torch.bool)
+        fused_valid = torch.ones(n_batch, fused_emb.shape[1], device=fused_emb.device, dtype=torch.bool)
 
         emb = fused_emb
         emb_valid = fused_valid
