@@ -47,7 +47,6 @@ For reference, this [wandb plot](https://wandb.ai/kit-mrt/red-motion-hptr/report
     title={RedMotion: Motion Prediction via Redundancy Reduction},
     author={Royden Wagner and Omer Sahin Tas and Marvin Klemp and Carlos Fernandez and Christoph Stiller},
     journal={Transactions on Machine Learning Research},
-    issn={2835-8856},
     year={2024},
 }
 ```
