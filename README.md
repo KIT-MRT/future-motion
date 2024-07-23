@@ -15,7 +15,7 @@ conda env create -f conda_env.yml
 
 Prepare Waymo Open Motion and Argoverse 2 Forecasting datasets by following the instructions in `src/external_submodules/hptr/README.md`.
 
-## Methods
+## Our methods
 
 ### RedMotion: Motion Prediction via Redundancy Reduction 
 
@@ -83,6 +83,28 @@ Soon to be released.
 
 </details>
 
+## Other methods
+
+### Wayformer: Motion Forecasting via Simple & Efficient Attention Networks
+
+![Wayformer](figures/wayformer.png "Wayformer")
+
+Wayformer models take multimodal scene data as input, project it into a homogeneous (i.e., same dim) token format, and transform learned seeds (i.e., trajectory anchors) into multimodal distributions of trajectories.
+
+We provide an open-source implementation of the Wayformer model with an early fusion scene encoder and multi-axis latent query attention. Our implementation is a refactored version of the `AgentCentricGlobal` model from the HPTR repo with improved performance (higher mAP scores).
+
+The hyperparameters defined in `configs/model/ac_wayformer.yaml` follow the ones in Table 4 (see [Appendix D in the Wayformer paper](https://arxiv.org/abs/2207.05844)) except the number of decoders is 1 instead of 3.
+
+<details>
+<summary><big><b>More details</b></big></summary>
+
+We use the polyline representation of MPA ([Konev, 2022](https://arxiv.org/abs/2206.10041)) as input and the non-maximum supression (NMS) algorithm of MTR ([Shi et. al., 2023](https://arxiv.org/abs/2209.13508)) to generate 6 trajetories from the predicted 64 trajectories.
+
+Adapt the paths and accounts in `sbatch/train_wayformer_juwels.sh` to your setup to train a Wayformer model on a Juwels-like cluster with a Slurm system and at least 2 nodes with 4 A100 GPUs each.
+The training is configured for the Waymo Open Motion dataset and takes roughly 24h.
+
+
+</details>
 
 ## Acknowledgements
 This repo builds upon the great work [HPTR](https://github.com/zhejz/HPTR) by [@zhejz](https://github.com/zhejz). 
