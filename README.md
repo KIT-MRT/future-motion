@@ -47,7 +47,6 @@ For reference, this [wandb plot](https://wandb.ai/kit-mrt/red-motion-hptr/report
     title={RedMotion: Motion Prediction via Redundancy Reduction},
     author={Royden Wagner and Omer Sahin Tas and Marvin Klemp and Carlos Fernandez and Christoph Stiller},
     journal={Transactions on Machine Learning Research},
-    issn={2835-8856},
     year={2024},
 }
 ```
@@ -103,6 +102,16 @@ We use the polyline representation of MPA ([Konev, 2022](https://arxiv.org/abs/2
 Adapt the paths and accounts in `sbatch/train_wayformer_juwels.sh` to your setup to train a Wayformer model on a Juwels-like cluster with a Slurm system and at least 2 nodes with 4 A100 GPUs each.
 The training is configured for the Waymo Open Motion dataset and takes roughly 24h.
 
+
+<big><b>Reference</b></big>
+```bibtex
+@inproceedings{nayakanti2023wayformer,
+  title={Wayformer: Motion forecasting via simple \& efficient attention networks},
+  author={Nayakanti, Nigamaa and Al-Rfou, Rami and Zhou, Aurick and Goel, Kratarth and Refaat, Khaled S and Sapp, Benjamin},
+  booktitle={International Conference on Robotics and Automation (ICRA)},
+  year={2023},
+}
+```
 
 </details>
 
