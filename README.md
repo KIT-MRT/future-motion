@@ -103,6 +103,16 @@ Adapt the paths and accounts in `sbatch/train_wayformer_juwels.sh` to your setup
 The training is configured for the Waymo Open Motion dataset and takes roughly 24h.
 
 
+<big><b>Reference</b></big>
+```bibtex
+@inproceedings{nayakanti2023wayformer,
+  title={Wayformer: Motion forecasting via simple \& efficient attention networks},
+  author={Nayakanti, Nigamaa and Al-Rfou, Rami and Zhou, Aurick and Goel, Kratarth and Refaat, Khaled S and Sapp, Benjamin},
+  booktitle={International Conference on Robotics and Automation (ICRA)},
+  year={2023},
+}
+```
+
 </details>
 
 ## Acknowledgements
