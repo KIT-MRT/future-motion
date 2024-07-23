@@ -145,7 +145,7 @@ class Wayformer(nn.Module):
                 pred = rearrange(
                     pred,
                     "(n_decoder n_scene n_target n_pred) pred_dim n_step_future -> n_decoder n_scene n_target n_pred n_step_future pred_dim",
-                    n_decoder=n_decoder, n_scene=n_scene, n_target=n_target, n_pred=n_pred, n_step_future=n_step_future, pred_dim=pred_dim,
+                    n_decoder=n_decoder, n_scene=n_scene, n_target=n_target, n_pred=n_pred, pred_dim=pred_dim,
                 )
 
         assert torch.isfinite(conf).all()
