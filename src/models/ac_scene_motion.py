@@ -155,7 +155,7 @@ class SceneMotion(nn.Module):
             scene_emb = rearrange(red_emb, "(n_scene n_agent) n_token ... -> n_scene (n_agent n_token) ...", n_scene=n_scene, n_agent=n_agent, n_token=red_emb.shape[1])
             scene_emb_invalid = torch.zeros(scene_emb.shape[0], scene_emb.shape[1], device=scene_emb.device, dtype=torch.bool)
 
-            scene_emb = self.latent_context_module(src=scene_emb, tgt=scene_emb, tgt_padding_mask=scene_emb_invalid)
+            scene_emb, _ = self.latent_context_module(src=scene_emb, tgt=scene_emb, tgt_padding_mask=scene_emb_invalid)
 
             # Rearrange again for motion decoding
             emb = rearrange(scene_emb, "n_scene (n_agent n_token) ... -> (n_scene n_agent) n_token ...", n_scene=n_scene, n_agent=n_agent, n_token=red_emb.shape[1])
