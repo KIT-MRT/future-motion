@@ -82,6 +82,22 @@ Soon to be released.
 
 </details>
 
+### SceneMotiom: From Agent-centric Embeddings to Scene-wide Forecasts
+
+![SceneMotion](figures/scene_motion.png "SceneMotion")
+
+Our attention-based motion forecasting model is composed of stacked encoder and decoder modules. 
+Variable-sized agent-centric views $V_i$ are reduced to fixed-sized agent-centric embeddings $E_i$ via cross-attention with road environment descriptor (RED) tokens $R_j$. 
+Afterwards, we concatenate the agent-centric embeddings with global reference tokens $G_i$ and rearrange them to form a scene-wide embedding. 
+Our latent context module then learns global context and our motion decoder transforms learned anchors $A_k$ into scene-wide forecasts.
+
+<details>
+<summary><big><b>More details</b></big></summary>
+
+Soon to be released.
+
+</details>
+
 ## Other methods
 
 ### Wayformer: Motion Forecasting via Simple & Efficient Attention Networks
