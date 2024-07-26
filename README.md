@@ -82,7 +82,7 @@ Soon to be released.
 
 </details>
 
-### SceneMotiom: From Agent-centric Embeddings to Scene-wide Forecasts
+### SceneMotion: From Agent-centric Embeddings to Scene-wide Forecasts
 
 ![SceneMotion](figures/scene_motion.png "SceneMotion")
 
