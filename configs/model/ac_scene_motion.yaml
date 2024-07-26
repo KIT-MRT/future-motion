@@ -3,9 +3,10 @@ _target_: future_motion.FutureMotion
 time_step_current: 10
 time_step_end: 90
 n_video_batch: 3
-interactive_challenge: False
+interactive_challenge: True
 inference_cache_map: False
 inference_repeat_n: 1
+plot_motion: False
 
 model:
   _target_: models.ac_scene_motion.SceneMotion
