@@ -76,13 +76,24 @@ def main(config: DictConfig) -> None:
     strategy = None
     if torch.cuda.device_count() > 1:
         strategy = "ddp"
-    trainer: Trainer = hydra.utils.instantiate(
-        config.trainer,
-        strategy=strategy,
-        callbacks=callbacks,
-        logger=loggers,
-        _convert_="partial",
-    )
+
+    if config.action == "measure-inference-latency":
+        trainer: Trainer = hydra.utils.instantiate(
+            config.trainer,
+            strategy=strategy,
+            callbacks=callbacks,
+            logger=loggers,
+            _convert_="partial",
+            profiler="simple"
+        )
+    else:
+        trainer: Trainer = hydra.utils.instantiate(
+            config.trainer,
+            strategy=strategy,
+            callbacks=callbacks,
+            logger=loggers,
+            _convert_="partial",
+        )
 
     if config.action == "fit":
         trainer.fit(model=model, datamodule=datamodule)
@@ -90,6 +101,8 @@ def main(config: DictConfig) -> None:
         trainer.validate(model=model, datamodule=datamodule)
     elif config.action == "test":
         trainer.test(model=model, datamodule=datamodule)
+    elif config.action == "measure-inference-latency":
+        trainer.predict(model=model, datamodule=datamodule)
     else:
         raise NotImplementedError
 
