@@ -489,6 +489,19 @@ class FutureMotion(LightningModule):
         pred_dict = self.post_processing(pred_dict)
         self._save_to_submission_files(pred_dict, batch)
 
+    def forward(self, batch: Dict[str, Tensor]) -> Dict:
+        batch = self.pre_processing(batch)
+        input_dict = {
+            k.split("input/")[-1]: v for k, v in batch.items() if "input/" in k
+        }
+        pred_dict = {k.replace("/", "_"): v for k, v in batch.items() if "ref/" in k}
+        pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"] = self.model(
+            **input_dict
+        )
+        pred_dict = self.post_processing(pred_dict)
+
+        return pred_dict
+
     def test_epoch_end(self, outputs):
         if self.global_rank == 0:
             self.sub_womd.save_sub_files(self.logger[0])
