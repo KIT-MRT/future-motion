@@ -1,3 +1,4 @@
 debug*
 dev*
 **/__pycache__
+logs*
