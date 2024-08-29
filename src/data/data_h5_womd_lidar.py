@@ -1,8 +1,11 @@
-from typing import Optional, Dict, Any, Tuple
-from pytorch_lightning import LightningDataModule
-from torch.utils.data import DataLoader, Dataset
-import numpy as np
+import time
 import h5py
+import torch
+import numpy as np
+
+from typing import Optional, Dict, Any, Tuple
+from torch.utils.data import DataLoader, Dataset
+from pytorch_lightning import LightningDataModule
 
 
 class DatasetBase(Dataset[Dict[str, np.ndarray]]):
@@ -11,7 +14,12 @@ class DatasetBase(Dataset[Dict[str, np.ndarray]]):
         self.tensor_size = tensor_size
         self.filepath = filepath
         filename = filepath.split('/')[-1]
-        self.filepath_lidar = f"{filepath[:-len(filename)]}/lidar/{filename}"
+        self.lidar_filepath = f"{filepath[:-len(filename)]}/lidar/{filename}"
+
+        self.bev_height, self.bev_width = 1024, 1024
+        self.lidar_range = {
+            "x_min": -75, "x_max": 75, "y_min": -75, "y_max": 75, "z_min": -1.25, "z_max": 2.75,
+        }
 
         with h5py.File(self.filepath, "r", libver="latest", swmr=True) as hf:
             self.dataset_len = int(hf.attrs["data_len"])
@@ -40,7 +48,14 @@ class DatasetTrain(DatasetBase):
             
             for k in self.tensor_size.keys():
                 out_dict[k] = np.ascontiguousarray(hf[idx_key][k])
-        
+
+        with h5py.File(self.lidar_filepath, "r", libver="latest", swmr=True) as hf:
+            for step_hist in range(11):
+                pcd = np.ascontiguousarray(hf[f'/{out_dict["scenario_id"]}/{step_hist}'])
+                out_dict[f"lidar_pillars/{step_hist}"] = convert_point_cloud_to_pillars(
+                    pcd, **self.lidar_range,
+                    bev_height=self.bev_height, bev_width=self.bev_width, device="cpu",
+                )
 
         return out_dict
 
@@ -63,6 +78,14 @@ class DatasetVal(DatasetBase):
                 if out_dict[k].shape != _size:
                     assert "agent" in k
                     out_dict[k] = np.ones(_size, dtype=out_dict[k].dtype)
+        with h5py.File(self.lidar_filepath, "r", libver="latest", swmr=True) as hf:
+            for step_hist in range(11):
+                pcd = np.ascontiguousarray(hf[f'/{out_dict["scenario_id"]}/{step_hist}'])
+                out_dict[f"lidar_pillars/{step_hist}"] = convert_point_cloud_to_pillars(
+                    pcd, **self.lidar_range,
+                    bev_height=self.bev_height, bev_width=self.bev_width, device="cpu",
+                )
+
         return out_dict
 
 
@@ -214,3 +237,124 @@ class DataH5womdLidar(LightningDataModule):
             drop_last=False,
             persistent_workers=True,
         )
+
+
+def convert_point_cloud_to_pillars(
+    pcd,
+    x_min,
+    x_max,
+    y_min,
+    y_max,
+    z_min,
+    z_max,
+    bev_height,
+    bev_width,
+    device,
+):
+    pcd = filter_point_cloud(pcd, x_min, x_max, y_min, y_max, z_min, z_max)
+    pcd[:, 3] = np.tanh(pcd[:, 3]) # Scale intensity to [0, 1]
+    pcd[:, 0] -= x_min # Set origin to (x, y, z) = (0, 0, 0)
+    pcd[:, 1] -= y_min
+    pcd[:, 2] -= z_min
+    
+    x_range = x_max - x_min
+    discretization_coeff = x_range / bev_height
+    bev_pillars = rasterize_bev_pillars(
+        torch.tensor(pcd), discretization_coeff, bev_height, bev_width, z_max, z_min, device=device
+    )
+
+    return bev_pillars
+
+
+def rasterize_bev_pillars(
+    point_cloud: torch.Tensor,
+    discretization_coefficient: float = 50 / 608,
+    bev_height: int = 608,
+    bev_width: int = 608,
+    z_max: float = 1.27,
+    z_min: float = -2.73,
+    n_lasers: int = 128,
+    device: str = "cuda",
+) -> torch.Tensor:
+    height = bev_height + 1
+    width = bev_width + 1
+
+    _point_cloud = torch.clone(point_cloud)  # Local copy required?
+    _point_cloud = _point_cloud.to(device, dtype=torch.float32)
+
+    # Discretize x and y coordinates
+    _point_cloud[:, 0] = torch.floor(_point_cloud[:, 0] / discretization_coefficient)
+    _point_cloud[:, 1] = torch.floor(_point_cloud[:, 1] / discretization_coefficient)
+
+    # Get unique indices to rasterize and unique counts to compute the point density
+    _, unique_indices, _, unique_counts = unique_torch(_point_cloud[:, 0:2], dim=0)
+    _point_cloud_top = _point_cloud[unique_indices]
+
+    # Intensity, height and density maps
+    intensity_map = torch.zeros((height, width), dtype=torch.float32, device=device)
+    height_map = torch.zeros((height, width), dtype=torch.float32, device=device)
+    density_map = torch.zeros((height, width), dtype=torch.float32, device=device)
+
+    x_indices = _point_cloud_top[:, 0].long()
+    y_indices = _point_cloud_top[:, 1].long()
+
+    intensity_map[x_indices, y_indices] = _point_cloud_top[:, 3]
+
+    max_height = np.float32(np.abs(z_max - z_min))
+    height_map[x_indices, y_indices] = _point_cloud_top[:, 2] / max_height
+
+    normalized_counts = torch.log(unique_counts + 1) / np.log(n_lasers)
+    normalized_counts = torch.clamp(normalized_counts, min=0.0, max=1.0)
+    density_map[x_indices, y_indices] = normalized_counts
+
+    pillars = torch.zeros(
+        (3, bev_height, bev_width), dtype=torch.float32, device=device
+    )
+    pillars[0, :, :] = intensity_map[:bev_height, :bev_width]
+    pillars[1, :, :] = height_map[:bev_height, :bev_width]
+    pillars[2, :, :] = density_map[:bev_height, :bev_width]
+
+    return pillars
+
+
+def unique_torch(x: torch.Tensor, dim: int = 0) -> tuple:
+    # Src: https://github.com/pytorch/pytorch/issues/36748
+    unique, inverse, counts = torch.unique(
+        x, dim=dim, sorted=True, return_inverse=True, return_counts=True
+    )
+    # inv_sorted = inverse.argsort(stable=True)
+    inv_sorted = inverse.argsort(dim=-1)
+    tot_counts = torch.cat((counts.new_zeros(1), counts.cumsum(dim=0)))[:-1]
+    index = inv_sorted[tot_counts]
+
+    return unique, index, inverse, counts
+
+
+def filter_point_cloud(
+    point_cloud: np.ndarray,
+    x_min: float,
+    x_max: float,
+    y_min: float,
+    y_max: float,
+    z_min: float,
+    z_max: float,
+) -> np.ndarray:
+    mask = np.where(
+        (point_cloud[:, 0] >= x_min)
+        & (point_cloud[:, 0] <= x_max)
+        & (point_cloud[:, 1] >= y_min)
+        & (point_cloud[:, 1] <= y_max)
+        & (point_cloud[:, 2] >= z_min)
+        & (point_cloud[:, 2] <= z_max)
+    )
+    point_cloud = point_cloud[mask]
+
+    return point_cloud
+
+
+def np_pad_to_shape(array, target_shape):
+    return np.pad(
+        array,
+        [(0, target_shape[i] - array.shape[i]) for i in range(len(array.shape))],
+        "constant",
+    )
