@@ -64,9 +64,9 @@ class HungarianNLL(NllMetrics):
         gt_det_cls = gt_target_type.to(dtype=torch.int).argmax(dim=-1)
         matched_pred_det_cls = pred_det_cls[torch.arange(n_scene).unsqueeze(1), pred_idx]
 
-        matched_gt_det_cls = rearrange(gt_det_cls, "n_scene n_target -> (n_scene n_target)")
+        gt_det_cls = rearrange(gt_det_cls, "n_scene n_target -> (n_scene n_target)")
         matched_pred_det_cls = rearrange(matched_pred_det_cls, "n_scene n_target n_class -> (n_scene n_target) n_class")
-        self.error_det_cls = F.cross_entropy(matched_pred_det_cls, matched_gt_det_cls)
+        self.error_det_cls = F.cross_entropy(matched_pred_det_cls, gt_det_cls)
 
         pred_conf = pred_conf[0]
         pred_pos = pred_pos[0]
