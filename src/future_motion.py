@@ -1,3 +1,4 @@
+import time
 import hydra
 import torch
 import wandb
@@ -13,6 +14,7 @@ from models.modules.neural_collapse import OnlineLinearClassifier
 from models.metrics.representation_eval import std_of_l2_normalized
 from data.lang_labels import agent_dict, direction_dict, speed_dict, acceleration_dict
 from data.plot_3d import plot_motion_forecasts, mplfig_to_npimage, tensor_dict_to_cpu
+from models.metrics.hungarian_nll import sorted_hungarian_matching
 
 
 class FutureMotion(LightningModule):
@@ -38,6 +40,7 @@ class FutureMotion(LightningModule):
         measure_neural_collapse: bool = False,
         plot_motion: bool = True,
         control_temperatures: list = [-20, -10, 0, 10, 20],
+        is_e2e: bool = False,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
@@ -160,6 +163,10 @@ class FutureMotion(LightningModule):
                 pred_dict["pred"],
                 target_embs,
             ) = self.model(**input_dict)
+        elif self.hparams.is_e2e:
+            pred_dict["pred_det_pos_rot"], pred_dict["pred_det_cls"], pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"] = (
+                self.model(**input_dict)
+            )
         else:
             pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"] = (
                 self.model(**input_dict)
@@ -395,6 +402,30 @@ class FutureMotion(LightningModule):
                     std_of_target_emb,
                     sync_dist=True,
                 )
+        elif self.hparams.is_e2e:
+            pred_dict["pred_det_pos_rot"], pred_dict["pred_det_cls"], pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"] = (
+                self.model(**input_dict)
+            )
+            # Hungarian matching: TODO also in test_step before post_processing
+            pred_det_pos_rot = pred_dict["pred_det_pos_rot"][0]
+
+            gt_det_rot = batch["gt/sdc2target_rot"][:, :, 1]
+            gt_det_pos_rot = torch.cat((batch["gt/sdc2target_pos"], gt_det_rot), dim=-1)
+
+            n_scene = gt_det_pos_rot.shape[0]
+            pred_idx = torch.zeros(gt_det_pos_rot.shape[:2], dtype=torch.long)
+
+            for scene_idx in range(n_scene):
+                pred_idx[scene_idx] = sorted_hungarian_matching(pred_det_pos_rot[scene_idx], gt_det_pos_rot[scene_idx])
+
+            pred_conf = pred_dict["pred_conf"][0]
+            pred = pred_dict["pred"][0]
+            
+            matched_pred_conf = pred_conf[torch.arange(n_scene).unsqueeze(1), pred_idx] 
+            matched_pred = pred[torch.arange(n_scene).unsqueeze(1), pred_idx]
+
+            pred_dict["pred_conf"] = matched_pred_conf.unsqueeze(0)
+            pred_dict["pred"] = matched_pred.unsqueeze(0)
         else:
             pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"] = (
                 self.model(
