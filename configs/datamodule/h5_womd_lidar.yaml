@@ -1,0 +1,10 @@
+_target_: data.data_h5_womd_lidar.DataH5womdLidar
+
+data_dir: ""
+filename_train: training
+filename_val: validation
+filename_test: testing
+n_agent: 64
+
+batch_size: 3
+num_workers: 16 # 32 # test with more
