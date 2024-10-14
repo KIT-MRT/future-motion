@@ -38,6 +38,7 @@ class FutureMotion(LightningModule):
         measure_neural_collapse: bool = False,
         plot_motion: bool = True,
         control_temperatures: list = [-20, -10, 0, 10, 20],
+        pre_training: bool = False,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
@@ -152,6 +153,14 @@ class FutureMotion(LightningModule):
             pred_dict = {
                 k.replace("/", "_"): v for k, v in batch.items() if "ref/" in k
             }
+
+        if self.hparams.pre_training:
+            loss, agent_loss, map_loss, traffic_light_loss = self.model(**input_dict)
+            self.log("train/loss", loss, sync_dist=True)
+            self.log("train/agent_loss", agent_loss, sync_dist=True) 
+            self.log("train/map_loss", map_loss, sync_dist=True)
+            self.log("train/traffic_light_loss", traffic_light_loss, sync_dist=True)
+            return loss
 
         if self.hparams.measure_neural_collapse:
             (
@@ -296,7 +305,6 @@ class FutureMotion(LightningModule):
         return metrics_dict[f"{self.train_metric.prefix}/loss"]
 
     def validation_step(self, batch: Dict[str, Tensor], batch_idx: int) -> Dict:
-        # ! pre-processing
         for _ in range(self.hparams.inference_repeat_n):
             batch = self.pre_processing(batch)
             input_dict = {
@@ -306,7 +314,14 @@ class FutureMotion(LightningModule):
                 k.replace("/", "_"): v for k, v in batch.items() if "ref/" in k
             }
 
-        # ! model inference
+        if self.hparams.pre_training:
+            loss, agent_loss, map_loss, traffic_light_loss = self.model(**input_dict)
+            self.log("val/loss", loss, sync_dist=True)
+            self.log("val/agent_loss", agent_loss, sync_dist=True) 
+            self.log("val/map_loss", map_loss, sync_dist=True)
+            self.log("val/traffic_light_loss", traffic_light_loss, sync_dist=True)
+            return loss
+        
         if self.hparams.measure_neural_collapse:
             (
                 pred_dict["pred_valid"],
@@ -463,6 +478,9 @@ class FutureMotion(LightningModule):
         self._save_to_submission_files(pred_dict, batch)
 
     def validation_epoch_end(self, outputs):
+        if self.hparams.pre_training:
+            return None
+        
         epoch_waymo_metrics = self.waymo_metric.compute_waymo_motion_metrics()
         epoch_waymo_metrics["epoch"] = self.current_epoch
         for k, v in epoch_waymo_metrics.items():
