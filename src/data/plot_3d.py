@@ -9,7 +9,7 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 def plot_motion_forecasts(
     batch,
     pred_dict,
-    n_step_future=60,
+    n_step_future=60,  # 80 for waymo
     idx_t_now=50,
     idx_batch=1,
     ax_dist=5,
@@ -89,7 +89,7 @@ def plot_motion_forecasts(
                     c=plt.cm.viridis(np.linspace(0, 1, n_step_future)),
                     lw=10,
                     zorder=1,
-                )  # 80 for waymo
+                )
 
     # Plot agents:
     for idx, (agent_pos, agent_type, agent_yaw, agent_role, agent_spd) in enumerate(
