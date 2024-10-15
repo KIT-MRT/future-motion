@@ -55,7 +55,8 @@ def plot_motion_forecasts(
 
     for idx in range(n_modes):
         if mode_setting in ["top", "custom"] and idx > 0:
-            continue
+            break
+
         if idx_focal is not None:
             agent = trajs[idx_batch, idx_focal]
             idx_mode = (
