@@ -55,7 +55,7 @@ class SceneTransformer(SceneCentricGlobal):
             **kwargs
         )
 
-        self.pre_training_mode = kwargs.get("pre_training_mode", False)
+        self.pre_training_mode = kwargs.get("pre_training_mode", None)
 
         if self.pre_training_mode == "joint_motion":
             # Unique mask token per modality
