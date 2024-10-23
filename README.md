@@ -3,6 +3,16 @@
 
 Common repo for our ongoing research on motion forecasting in self-driving vehicles.
 
+## Table of contents
+- [Setup](#setup)
+- [Our methods](#our-methods)
+  * [RedMotion](#redmotion-motion-prediction-via-redundancy-reduction)
+  * [Words in Motion](#words-in-motion-extracting-interpretable-control-vectors-for-motion-transformers)
+  * [SceneMotion](#scenemotion-from-agent-centric-embeddings-to-scene-wide-forecasts)
+  * [JointMotion](#jointmotion-joint-self-supervision-for-joint-motion-prediction)
+- [Other methods](#other-methods)
+  * [Wayformer](#wayformer-motion-forecasting-via-simple--efficient-attention-networks)
+
 ## Setup
 Clone this repo, afterwards init external submodules with:
 ```bash
@@ -53,11 +63,16 @@ For reference, this [wandb plot](https://wandb.ai/kit-mrt/red-motion-hptr/report
 
 </details>
 
-### Words in Motion: Representation Engineering for Motion Forecasting
+### Words in Motion: Extracting Interpretable Control Vectors for Motion Transformers
 
 ![Words in Motion](figures/words_in_motion.png "Words in Motion")
 
-We use natural language to quantize motion features in an inter-pretable way. (b) The corresponding direction, speed, and acceleration classes are highlighted in blue. (c) To reverse engineer motion forecasting models, we measure the degree to which these features are embedded in their hidden states H with linear probes. Furthermore, we use our discrete motion features to fit control vectors V that allow for controlling motion forecasts during inference.
+Words in Motion is a mechanistic interpretability method for interpreting recent motion transformer models.
+
+**(a)** We classify motion features in an interpretable way, as in natural language.
+
+**(b)** We measure the degree to which these interpretable features are embedded in the hidden states $H_i$ of transformer models with linear probes.
+Furthermore, we use our discrete features to fit interpretable control vectors $V_i$ that allow for controlling motion forecasts at inference.
 
 <details>
 <summary><big><b>More details</b></big></summary>
@@ -90,6 +105,23 @@ Our attention-based motion forecasting model is composed of stacked encoder and 
 Variable-sized agent-centric views $V_i$ are reduced to fixed-sized agent-centric embeddings $E_i$ via cross-attention with road environment descriptor (RED) tokens $R_j$. 
 Afterwards, we concatenate the agent-centric embeddings with global reference tokens $G_i$ and rearrange them to form a scene-wide embedding. 
 Our latent context module then learns global context and our motion decoder transforms learned anchors $A_k$ into scene-wide forecasts.
+
+<details>
+<summary><big><b>More details</b></big></summary>
+
+Soon to be released.
+
+</details>
+
+### JointMotion: Joint Self-Supervision for Joint Motion Prediction
+
+![JointMotion](figures/joint_motion.png "JointMotion")
+
+JointMotion is a self-supervised pre-training method that improves joint motion prediction.
+
+**(a)** Connecting motion and environments: Our scene-level objective learns joint scene representations via non-contrastive similarity learning of motion sequences $M$ and environment context $E$. 
+
+**(b)** Masked polyline modeling: Our instance-level objective refines learned representations via masked autoencoding of multimodal polyline embeddings (i.e., motion, lane, and traffic light data).
 
 <details>
 <summary><big><b>More details</b></big></summary>
