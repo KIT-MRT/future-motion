@@ -265,17 +265,12 @@ class SceneTransformer(SceneCentricGlobal):
                 d=278,
             )
 
-            # loss_map = F.huber_loss(pred_map_attr[map_valid], map_attr[map_valid])
-            # loss_tl = torch.nan_to_num(F.huber_loss(pred_tl_attr[tl_valid], tl_attr[tl_valid]), nan=0.0) # Not all scenes contain traffic lights
-            # loss_agent = F.huber_loss(pred_agent_attr[agent_valid], agent_attr[agent_valid])
-
             map_emb = masked_mean_aggregation(map_emb, map_emb_valid)
             tl_emb = torch.nan_to_num(
                 masked_mean_aggregation(tl_emb, tl_emb_valid), nan=0.0
             )
             agent_emb = masked_mean_aggregation(agent_emb, agent_emb_valid)
             env_emb = self.env_proj(torch.cat((map_emb, tl_emb), dim=-1))
-            # agent_emb = self.motion_proj(agent_emb)
             motion_emb = self.motion_proj(agent_emb)
 
             loss, agent_loss, map_loss, traffic_light_loss = get_joint_motion_loss(
@@ -292,12 +287,6 @@ class SceneTransformer(SceneCentricGlobal):
             )
 
             return loss, agent_loss, map_loss, traffic_light_loss
-
-            # loss_cross_red = get_barlow_twins_loss(map_emb, agent_emb, lambda_coeff=0.005) # 300 - 60 in first epoch lambda = 0.01 or 0.001
-
-            # loss = loss_cross_red * 0.01 + loss_map + loss_tl + loss_agent # 1.42 - 0.15 in first epoch
-
-            # return loss, loss_map, loss_tl, loss_agent
         else:
             return super().forward(
                 agent_valid,
