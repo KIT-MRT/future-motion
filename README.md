@@ -139,7 +139,19 @@ JointMotion is a self-supervised pre-training method that improves joint motion 
 <details>
 <summary><big><b>More details</b></big></summary>
 
-Soon to be released.
+Adapt the paths and accounts in `sbatch/pre_train_joint_motion_scene_transformer_juwels.sh` to your setup to pre-train a Scene Transformer model with the JointMotion objective on a Juwels-like cluster with a Slurm system and at least 1 node with 4 A100 GPUs.
+The pre-training is configured for the Waymo Open Motion dataset and takes 10h.
+The Scene Transformer model is based on the implementation in [HPTR](https://github.com/zhejz/HPTR) and uses their decoder.
+
+<big><b>Reference</b></big>
+```bibtex
+@inproceedings{wagner2024jointmotion,
+  title={JointMotion: Joint Self-Supervision for Joint Motion Prediction},
+  author={Wagner, Royden and Tas, Omer Sahin and Klemp, Marvin and Fernandez, Carlos},
+  booktitle={Conference on Robot Learning (CoRL)},
+  year={2024},
+}
+```
 
 </details>
 
