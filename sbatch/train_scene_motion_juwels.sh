@@ -1,14 +1,14 @@
 #!/bin/bash -x
 #SBATCH --account=CHANGE_TO_YOUR_JUWELS_ACCOUNT
 #SBATCH --partition=booster
-#SBATCH --nodes=2
+#SBATCH --nodes=1
 #SBATCH --gres=gpu:4
 #SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=0
 #SBATCH --time=23:59:00
-#SBATCH --output=CHANGE_TO_YOUR_LOG_FOLDER/logs/slurm/wayformer-out.%j
-#SBATCH --error=CHANGE_TO_YOUR_LOG_FOLDER/logs/slurm/wayformer-err.%j
+#SBATCH --output=CHANGE_TO_YOUR_LOG_FOLDER/logs/slurm/scene_motion-out.%j
+#SBATCH --error=CHANGE_TO_YOUR_LOG_FOLDER/logs/slurm/scene_motion-err.%j
 
 # srun will no longer read in SLURM_CPUS_PER_TASK and will not inherit option
 # --cpus-per-task from sbatch! This means you will explicitly have to specify
@@ -28,9 +28,11 @@ export WANDB_CACHE_DIR="CHANGE_TO_YOUR_LOG_FOLDER/logs/wandb"
 DATASET_DIR="CHANGE_TO_YOUR_DATA_FOLDER/data/waymo_motion" 
 WANDB_ENTITY="CHANGE_TO_YOUR_WANDB_ACCOUNT"
 WANDB_PROJECT="future-motion"
-BATCH_SIZE=16 # A100: precision fp32
-# BATCH_SIZE=20 # A6000 or A100 bf16
-NUM_NODES=2
+BATCH_SIZE=28 # A100: precision fp32
+# BATCH_SIZE=32 # A6000 or A100 bf16
+NUM_NODES=1
+NUM_EPOCHS=50 # Joint version
+# NUM_EPOCHS=128 # For training a marginal version from scratch 
 
 # Cd to code and run
 cd CHANGE_TO_YOUR_CODE_FOLDER/code/future-motion
@@ -38,11 +40,11 @@ cd CHANGE_TO_YOUR_CODE_FOLDER/code/future-motion
 srun python -u src/train_and_eval.py \
     trainer=womd \
     trainer.num_nodes=$NUM_NODES \
-    trainer.max_epochs=200 \
-    model="ac_wayformer" \
+    trainer.max_epochs=$NUM_EPOCHS \
+    model="ac_scene_motion" \
     datamodule.batch_size=$BATCH_SIZE \
     datamodule=h5_womd \
-    loggers.wandb.name='train_wayformer_${now:%Y-%m-%d-%H-%M-%S}' \
+    loggers.wandb.name='train_scene_motion_${now:%Y-%m-%d-%H-%M-%S}' \
     loggers.wandb.project=$WANDB_PROJECT \
     loggers.wandb.entity=$WANDB_ENTITY \
     +loggers.wandb.offline=True \
