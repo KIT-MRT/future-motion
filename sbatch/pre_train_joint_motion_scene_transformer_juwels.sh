@@ -39,6 +39,8 @@ srun python -u src/train_and_eval.py \
     trainer.num_nodes=$NUM_NODES \
     +trainer.max_time="00:10:00:00" \
     model="sc_scene_transformer_joint_motion" \
+    model.pre_training=True \
+    +model.model.pre_training_mode="joint_motion" \
     datamodule.batch_size=$BATCH_SIZE \
     datamodule=h5_womd \
     loggers.wandb.name='pre_train_joint_motion_scene_transformer_${now:%Y-%m-%d-%H-%M-%S}' \
