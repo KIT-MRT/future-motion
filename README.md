@@ -82,7 +82,7 @@ Soon to be released.
 
 </details>
 
-### SceneMotion: From Agent-centric Embeddings to Scene-wide Forecasts
+### SceneMotion: From Agent-Centric Embeddings to Scene-Wide Forecasts
 
 ![SceneMotion](figures/scene_motion.png "SceneMotion")
 
@@ -94,7 +94,20 @@ Our latent context module then learns global context and our motion decoder tran
 <details>
 <summary><big><b>More details</b></big></summary>
 
-Soon to be released.
+Adapt the paths and accounts in `sbatch/train_scene_motion_juwels.sh` to your setup to train a SceneMotion model on a Juwels-like cluster with a Slurm system and at least 1 node with 4 A100 GPUs.
+The training is configured for the Waymo Open Motion dataset.
+
+To train the model for marginal motion forecasting, add `model.interactive_challenge=False` and `model.train_metric.winner_takes_all=hard1` to the srun command in the train script.
+
+<big><b>Reference</b></big>
+```bibtex
+@inproceedings{wagner2024scenemotion,
+  title={SceneMotion: From Agent-Centric Embeddings to Scene-Wide Forecasts},
+  author={Wagner, Royden and Tas, {\"O}mer Sahin and Steiner, Marlon and Konstantinidis, Fabian and K{\"o}nigshof, Hendrik and Klemp, Marvin and Fernandez, Carlos and Stiller, Christoph},
+  booktitle={International Conference on Intelligent Transportation Systems (ITSC)},
+  year={2024}
+}
+```
 
 </details>
 
