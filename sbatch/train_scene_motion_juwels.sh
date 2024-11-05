@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:4
 #SBATCH --ntasks-per-node=4
-#SBATCH --cpus-per-task=24
+#SBATCH --cpus-per-task=12
 #SBATCH --mem=0
 #SBATCH --time=23:59:00
 #SBATCH --output=CHANGE_TO_YOUR_LOG_FOLDER/logs/slurm/scene_motion-out.%j
@@ -12,7 +12,7 @@
 
 # srun will no longer read in SLURM_CPUS_PER_TASK and will not inherit option
 # --cpus-per-task from sbatch! This means you will explicitly have to specify
-export SRUN_CPUS_PER_TASK=24
+export SRUN_CPUS_PER_TASK=12
 
 # Optional to disable the external environment, necessary, if python version is different
 module purge
