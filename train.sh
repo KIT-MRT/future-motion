@@ -14,12 +14,12 @@ run() {
     model="$1" \
     datamodule.batch_size=$BATCH_SIZE \
     datamodule=h5_womd \
-    loggers.wandb.name='train_red_motion_${now:%Y-%m-%d-%H-%M-%S}' \
+    loggers.wandb.name='train_'$1'_${now:%Y-%m-%d-%H-%M-%S}' \
     loggers.wandb.project=$WANDB_PROJECT \
     loggers.wandb.entity=$WANDB_ENTITY \
     +loggers.wandb.offline=True \
     datamodule.data_dir=$DATASET_DIR \
-    hydra.run.dir='${HYDRA_RUN_DIR}/${now:%Y-%m-%d}/${now:%H-%M-%S}'
+    hydra.run.dir=$HYDRA_RUN_DIR'/${now:%Y-%m-%d}/${now:%H-%M-%S}'
 }
 
 run $1
