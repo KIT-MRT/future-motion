@@ -14,16 +14,28 @@ Common repo for our ongoing research on motion forecasting in self-driving vehic
   * [Wayformer](#wayformer-motion-forecasting-via-simple--efficient-attention-networks)
 
 ## Setup
-Clone this repo, afterwards init external submodules with:
+1. Create a new workspace folder, e.g.
 ```bash
-git submodule update --init --recursive
+mkdir motion_forecasting_ws
+cd motion_forecasting_ws
 ```
-Create a conda environment named "future-motion" with:
+2. Clone this repository and our adapted version of `HPTR`:
 ```bash
-conda env create -f conda_env.yml
+git clone git@github.com:KIT-MRT/future-motion.git
+git clone git@github.com:KIT-MRT/hptr.git
+```
+3. Create a conda environment named `future-motion` with:
+```bash
+conda env create -f future-motion/conda_env.yml
+conda activate future-motion
+```
+4. Install `future-motion` and `hptr` as editable packages:
+```bash
+pip install -e future-motion
+pip install -e hptr
 ```
 
-Prepare Waymo Open Motion and Argoverse 2 Forecasting datasets by following the instructions in `src/external_submodules/hptr/README.md`.
+Prepare Waymo Open Motion and Argoverse 2 Forecasting datasets by following the instructions in the [HPTR repository](https://github.com/zhejz/HPTR).
 
 ## Our methods
 
