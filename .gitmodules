@@ -1,4 +1,0 @@
-[submodule "src/external_submodules/hptr"]
-	path = src/external_submodules/hptr
-	url = https://github.com/roydenwa/hptr.git
-	branch = importable
