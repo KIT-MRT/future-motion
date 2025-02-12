@@ -2,7 +2,7 @@ checkpoint: null
 resume_trainer: True
 model_overrides:
  sub_womd:
-    _target_: external_submodules.hptr.src.utils.submission.SubWOMD
+    _target_: hptr.utils.submission.SubWOMD
     activate: False
     method_name: ""  
     authors: [""]
@@ -11,5 +11,5 @@ model_overrides:
     method_link: ""
     account_name: ""
   sub_av2:
-    _target_: external_submodules.hptr.src.utils.submission.SubAV2
+    _target_: hptr.utils.submission.SubAV2
     activate: True

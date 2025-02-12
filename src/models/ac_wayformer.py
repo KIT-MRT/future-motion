@@ -7,11 +7,11 @@ from torch import nn, Tensor
 from einops import rearrange
 from omegaconf import DictConfig
 
-from external_submodules.hptr.src.models.modules.mlp import MLP
-from external_submodules.hptr.src.models.modules.point_net import PointNet
-from external_submodules.hptr.src.models.modules.transformer import TransformerBlock
-from external_submodules.hptr.src.models.modules.multi_modal import MultiModalAnchors
-from external_submodules.hptr.src.models.modules.decoder_ensemble import DecoderEnsemble, MLPHead
+from hptr.models.modules.mlp import MLP
+from hptr.models.modules.point_net import PointNet
+from hptr.models.modules.transformer import TransformerBlock
+from hptr.models.modules.multi_modal import MultiModalAnchors
+from hptr.models.modules.decoder_ensemble import DecoderEnsemble, MLPHead
 
 
 class Wayformer(nn.Module):

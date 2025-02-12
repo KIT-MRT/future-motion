@@ -1,4 +1,4 @@
-_target_: external_submodules.hptr.src.data_modules.data_h5_av2.DataH5av2
+_target_: hptr.data_modules.data_h5_av2.DataH5av2
 
 data_dir: ""
 filename_train: training

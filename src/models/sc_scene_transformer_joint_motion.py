@@ -7,15 +7,15 @@ from einops import repeat, rearrange
 
 from typing import List, Tuple
 
-from external_submodules.hptr.src.models.modules.mlp import MLP
-from external_submodules.hptr.src.models.modules.rpe import get_rel_dist
-from external_submodules.hptr.src.models.sc_global import SceneCentricGlobal
+from hptr.models.modules.mlp import MLP
+from hptr.models.modules.rpe import get_rel_dist
+from hptr.models.sc_global import SceneCentricGlobal
 
-from .modules.local_attn import LocalEncoder  # opt. rename to LocalAttnBlock / Module
+from future_motion.models.modules.local_attn import LocalEncoder  # opt. rename to LocalAttnBlock / Module
 
-from .metrics.barlow_twins import get_barlow_twins_loss
-from .metrics.mae import get_masked_and_unmasked_indices
-from .metrics.joint_motion import masked_mean_aggregation, get_joint_motion_loss
+from future_motion.models.metrics.barlow_twins import get_barlow_twins_loss
+from future_motion.models.metrics.mae import get_masked_and_unmasked_indices
+from future_motion.models.metrics.joint_motion import masked_mean_aggregation, get_joint_motion_loss
 
 
 class SceneTransformer(SceneCentricGlobal):

@@ -7,11 +7,11 @@ from einops import rearrange
 from torch import nn, Tensor
 from omegaconf import DictConfig
 
-from external_submodules.hptr.src.models.modules.transformer import TransformerBlock
-from external_submodules.hptr.src.models.modules.decoder_ensemble import DecoderEnsemble
+from hptr.models.modules.transformer import TransformerBlock
+from hptr.models.modules.decoder_ensemble import DecoderEnsemble
 
-from models.ac_wayformer import InputProjections
-from models.ac_red_motion import ReductionDecoder
+from future_motion.models.ac_wayformer import InputProjections
+from future_motion.models.ac_red_motion import ReductionDecoder
 
 
 class SceneMotion(nn.Module):

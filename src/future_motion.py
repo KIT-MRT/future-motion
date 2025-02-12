@@ -9,10 +9,10 @@ from omegaconf import DictConfig
 from pytorch_lightning import LightningModule
 from typing import Dict, List, Tuple, Optional
 
-from models.modules.neural_collapse import OnlineLinearClassifier
-from models.metrics.representation_eval import std_of_l2_normalized
-from data.lang_labels import agent_dict, direction_dict, speed_dict, acceleration_dict
-from data.plot_3d import plot_motion_forecasts, mplfig_to_npimage, tensor_dict_to_cpu
+from future_motion.models.modules.neural_collapse import OnlineLinearClassifier
+from future_motion.models.metrics.representation_eval import std_of_l2_normalized
+from future_motion.data.lang_labels import agent_dict, direction_dict, speed_dict, acceleration_dict
+from future_motion.data.plot_3d import plot_motion_forecasts, mplfig_to_npimage, tensor_dict_to_cpu
 
 
 class FutureMotion(LightningModule):
