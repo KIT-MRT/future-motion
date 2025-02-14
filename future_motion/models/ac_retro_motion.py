@@ -388,20 +388,20 @@ class DualDecoder(nn.Module):
                 motion_anchors = self.motion_anchors(valid.flatten(0, 1), emb, target_type.flatten(0, 1))
                 
                 # [n_batch, n_pred, hidden_dim]
-                motion_tokens, _ = self.transformer_blocks[0](src=motion_anchors, tgt=emb, tgt_padding_mask=emb_invalid)
+                motion_embs, _ = self.transformer_blocks[0](src=motion_anchors, tgt=emb, tgt_padding_mask=emb_invalid)
                 
                 # [n_scene, n_target, n_pred, hidden_dim]
-                motion_emb_0 = motion_tokens.view(valid.shape[0], valid.shape[1], self.n_pred, self.hidden_dim)
+                motion_emb_0 = motion_embs.view(valid.shape[0], valid.shape[1], self.n_pred, self.hidden_dim)
                 conf_0, pred_0 = self.mlp_decoders[0](valid, motion_emb_0, target_type)
         else:
             # [n_batch, n_pred, hidden_dim]
             motion_anchors = self.motion_anchors(valid.flatten(0, 1), emb, target_type.flatten(0, 1))
             
             # [n_batch, n_pred, hidden_dim]
-            motion_tokens, _ = self.transformer_blocks[0](src=motion_anchors, tgt=emb, tgt_padding_mask=emb_invalid)
+            motion_embs, _ = self.transformer_blocks[0](src=motion_anchors, tgt=emb, tgt_padding_mask=emb_invalid)
             
             # [n_scene, n_target, n_pred, hidden_dim]
-            motion_emb_0 = motion_tokens.view(valid.shape[0], valid.shape[1], self.n_pred, self.hidden_dim)
+            motion_emb_0 = motion_embs.view(valid.shape[0], valid.shape[1], self.n_pred, self.hidden_dim)
             
             if return_last_hidden_state:
                 conf_0, pred_0, last_hidden_state_0 = self.mlp_decoders[0](valid, motion_emb_0, target_type, return_last_hidden_state=True)
@@ -513,7 +513,7 @@ class DualDecoder(nn.Module):
         valid_tokenlike = rearrange(valid, "n_scene n_agent -> (n_scene n_agent)")
         valid_tokenlike = repeat(valid_tokenlike, "... -> ... n_pred", n_pred=self.n_pred)
         
-        retokenized_motion = self.mlp_reencoder(pred_0_tokenlike, valid_tokenlike)
+        reencoded_motion = self.mlp_reencoder(pred_0_tokenlike, valid_tokenlike)
         
         # global attn across all agents and modes (n_traget, n_pred)
         n_scene, n_target, *_ = pred_0.shape
@@ -536,11 +536,11 @@ class DualDecoder(nn.Module):
                 # print(f"{ref_role[..., 1]}") # targets with interactive behavior are always at index 0, 1 in train set
                 # https://waymo.com/open/data/motion/tfexample object of interest = with interactive behavior
 
-            motion_tokens_global = rearrange(retokenized_motion, "(n_scene n_target) n_pred hidden_dim -> n_scene n_target n_pred hidden_dim", n_scene=n_scene)
+            motion_embs_global = rearrange(reencoded_motion, "(n_scene n_target) n_pred hidden_dim -> n_scene n_target n_pred hidden_dim", n_scene=n_scene)
             
             
-            motion_tokens_global = motion_tokens_global[to_predict]
-            motion_tokens_global = rearrange(motion_tokens_global, "(n_scene n_role_to_predict) n_pred hidden_dim -> n_scene (n_role_to_predict n_pred) hidden_dim", n_scene=n_scene)
+            motion_embs_global = motion_embs_global[to_predict]
+            motion_embs_global = rearrange(motion_embs_global, "(n_scene n_role_to_predict) n_pred hidden_dim -> n_scene (n_role_to_predict n_pred) hidden_dim", n_scene=n_scene)
             
             valid_tokenlike = rearrange(valid_tokenlike, "(n_scene n_target) n_pred -> n_scene n_target n_pred", n_scene=n_scene)
             valid_tokenlike = valid_tokenlike[to_predict]
@@ -553,16 +553,16 @@ class DualDecoder(nn.Module):
             valid = valid[to_predict]
             valid = rearrange(valid, "(n_scene n_role_to_predict) -> n_scene n_role_to_predict", n_scene=n_scene)
         else:
-            motion_tokens_global = rearrange(retokenized_motion, "(n_scene n_target) n_pred hidden_dim -> n_scene (n_target n_pred) hidden_dim", n_scene=n_scene)
+            motion_embs_global = rearrange(reencoded_motion, "(n_scene n_target) n_pred hidden_dim -> n_scene (n_target n_pred) hidden_dim", n_scene=n_scene)
         
         valid_tokenlike_global = rearrange(valid_tokenlike, "(n_scene n_target) n_pred -> n_scene (n_target n_pred)", n_scene=n_scene)
-        motion_tokens_global, _ = self.transformer_blocks[1](src=motion_tokens_global, tgt=motion_tokens_global, tgt_padding_mask=valid_tokenlike_global)
+        motion_embs_global, _ = self.transformer_blocks[1](src=motion_embs_global, tgt=motion_embs_global, tgt_padding_mask=valid_tokenlike_global)
         
         # local alignment with scene context - map traffic light states etc.
          
-        motion_tokens_local = rearrange(motion_tokens_global, "n_scene (n_target n_pred) hidden_dim -> (n_scene n_target) n_pred hidden_dim", n_pred=self.n_pred)
+        motion_embs_local = rearrange(motion_embs_global, "n_scene (n_target n_pred) hidden_dim -> (n_scene n_target) n_pred hidden_dim", n_pred=self.n_pred)
         if pred_1_skip_context:
-            motion_tokens_1 = motion_tokens_local
+            motion_embs_1 = motion_embs_local
         else:
             if agent_0_as_global_ref:
                 # Only use scene embedding of agent 0 as context for all agents (used as global yet learned data-effient encoder is reused for other agent-centric views as well (for mraginal preds))
@@ -576,9 +576,9 @@ class DualDecoder(nn.Module):
                 emb = rearrange(emb, "n_scene n_joint_agents ... -> (n_scene n_joint_agents) ...")
                 emb_invalid = rearrange(emb_invalid, "n_scene n_joint_agents ... -> (n_scene n_joint_agents) ...")
                 
-            motion_tokens_1, _ = self.transformer_blocks[2](src=motion_tokens_local, tgt=emb, tgt_padding_mask=emb_invalid)
+            motion_embs_1, _ = self.transformer_blocks[2](src=motion_embs_local, tgt=emb, tgt_padding_mask=emb_invalid)
         
-        motion_emb_1 = motion_tokens_1.view(valid.shape[0], valid.shape[1], self.n_pred, self.hidden_dim)
+        motion_emb_1 = motion_embs_1.view(valid.shape[0], valid.shape[1], self.n_pred, self.hidden_dim)
         conf_1, pred_1 = self.mlp_decoders[1](valid, motion_emb_1, target_type)
         
         if self.n_dct_coeffs:
