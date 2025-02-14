@@ -288,7 +288,7 @@ class DualDecoder(nn.Module):
         self.n_pred = n_pred
         self.n_dct_coeffs = n_dct_coeffs
         self.dct_only_for_pos = dct_only_for_pos
-        self.mlp_reencoder_without_dct = mlp_reencoder_without_dct # TODO: dbl check tokenizer/ embedding layer naming etc. not tokenization as in MotionLM nor as in LLMs
+        self.mlp_reencoder_without_dct = mlp_reencoder_without_dct
         
         print(f"{use_fan_layer = }")
         print(f"{dct_only_for_pos = }")
