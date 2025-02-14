@@ -565,7 +565,7 @@ class DualDecoder(nn.Module):
             motion_tokens_1 = motion_tokens_local
         else:
             if agent_0_as_global_ref:
-                # TODO: only use scene embedding of agent 0 as context for all agents (used as global yet learned data-effient encoder is reused for other agent-centric views as well (for mraginal preds))
+                # Only use scene embedding of agent 0 as context for all agents (used as global yet learned data-effient encoder is reused for other agent-centric views as well (for mraginal preds))
                 emb = rearrange(emb, "(n_scene n_joint_agents) ... -> n_scene n_joint_agents ...", n_scene=n_scene)
                 emb_invalid = rearrange(emb_invalid, "(n_scene n_joint_agents) ... -> n_scene n_joint_agents ...", n_scene=n_scene)
                 n_joint_agents = emb.shape[1]
