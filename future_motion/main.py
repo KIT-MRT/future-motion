@@ -1,9 +1,12 @@
 import time
 import copy
+import scipy
 import hydra
 import torch
 import wandb
 import numpy as np
+import matplotlib.pyplot as plt
+
 
 from pathlib import Path
 from torch import Tensor, nn
@@ -710,10 +713,13 @@ class FutureMotion(LightningModule):
                     n_batches=n_batches, n_targets=2, n_pred=6,
                 )
                 
-                nrc1_hidden_states_0_32 = nrc1_feature_collapse(torch.cat(self.hidden_states_0, dim=0), dim_output=32) # 2x 16 DCT coeffs
-                nrc1_hidden_states_0_272 = nrc1_feature_collapse(torch.cat(self.hidden_states_0, dim=0), dim_output=272) # 2x 16 DCT coeffs + 3x 80 density params
-                nrc1_hidden_states_1_32 = nrc1_feature_collapse(torch.cat(self.hidden_states_1, dim=0), dim_output=32)
-                nrc1_hidden_states_1_272 = nrc1_feature_collapse(torch.cat(self.hidden_states_1, dim=0), dim_output=272)
+                hidden_states_0 = torch.cat(self.hidden_states_0, dim=0)
+                hidden_states_1 = torch.cat(self.hidden_states_1, dim=0)
+                
+                nrc1_hidden_states_0_32 = nrc1_feature_collapse(hidden_states_0, dim_output=32) # 2x 16 DCT coeffs
+                nrc1_hidden_states_0_272 = nrc1_feature_collapse(hidden_states_0, dim_output=272) # 2x 16 DCT coeffs + 3x 80 density params
+                nrc1_hidden_states_1_32 = nrc1_feature_collapse(hidden_states_1, dim_output=32)
+                nrc1_hidden_states_1_272 = nrc1_feature_collapse(hidden_states_1, dim_output=272)
                 
                 nrc1_hidden_states_1_pairwise_64 = nrc1_feature_collapse(hidden_states_1_pairwise, dim_output=64) # 2x 2x 16 DCT coeffs
                 nrc1_hidden_states_1_pairwise_544 = nrc1_feature_collapse(hidden_states_1_pairwise, dim_output=544)
@@ -748,6 +754,26 @@ class FutureMotion(LightningModule):
                     nrc1_hidden_states_1_pairwise_544,
                     sync_dist=True,
                 )
+                
+                if self.global_rank == 0:
+                    sv0 = scipy.linalg.svdvals(hidden_states_0.cpu())
+                    sv0_mean = scipy.linalg.svdvals(hidden_states_0.cpu() - hidden_states_0.cpu().mean(axis=0))
+                    sv1 = scipy.linalg.svdvals(hidden_states_1.cpu())
+                    sv1_mean = scipy.linalg.svdvals(hidden_states_1.cpu() - hidden_states_1.cpu().mean(axis=0))
+                    
+                    plt.plot(sv0, label='hidden0')
+                    plt.plot(sv1, label='hidden1')
+                    plt.legend()
+                    plt.title('Singular values')
+                    
+                    wandb.log({"Singular values": plt})
+                    
+                    plt.plot(sv0_mean, label='hidden0')
+                    plt.plot(sv1_mean, label='hidden1')
+                    plt.legend()
+                    plt.title('Singular values mean')
+                    
+                    wandb.log({"Singular values mean": plt})
                 
                 # Empty buffers
                 self.hidden_states_0 = []
