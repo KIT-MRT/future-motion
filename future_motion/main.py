@@ -7,18 +7,18 @@ import numpy as np
 
 from pathlib import Path
 from torch import Tensor, nn
+from einops import rearrange
 from omegaconf import DictConfig
 from pytorch_lightning import LightningModule
 from typing import Dict, List, Tuple, Optional
+from torchmetrics.functional import kl_divergence
+from torchmetrics.functional.regression import pearson_corrcoef, mean_squared_error
 
 from future_motion.models.modules.neural_collapse import OnlineLinearClassifier
 from future_motion.models.metrics.representation_eval import std_of_l2_normalized
+from future_motion.models.metrics.regression_collapse import nrc1_feature_collapse
 from future_motion.data.lang_labels import agent_dict, direction_dict, speed_dict, acceleration_dict
 from future_motion.data.plot_3d import plot_motion_forecasts, mplfig_to_npimage, tensor_dict_to_cpu
-
-from torchmetrics.functional.regression import pearson_corrcoef, mean_squared_error
-from torchmetrics.functional import kl_divergence
-from einops import rearrange
 
 
 class FutureMotion(LightningModule):
@@ -561,7 +561,7 @@ class FutureMotion(LightningModule):
             
             if self.hparams.measure_neural_regression_collapse:
                 self.hidden_states_0.append(last_hidden_state_0)
-                # self.hidden_states_1.append(retokenized_motion)
+                self.hidden_states_1.append(last_hidden_state_1)
             
             if self.hparams.save_path_hidden_states_dbl_decoding:
                 torch.save(pred_dict_0, f"{self.hparams.save_path_hidden_states_dbl_decoding}/pred_dict_0_batch_{batch_idx:04}.pt")
@@ -702,6 +702,56 @@ class FutureMotion(LightningModule):
             
             for k, v in epoch_waymo_metrics_0.items():
                 self.log(k, v, on_epoch=True)
+            
+            if self.hparams.measure_neural_regression_collapse:
+                n_batches = len(self.hidden_states_0)
+                
+                hidden_states_1_pairwise = rearrange(torch.cat(self.hidden_states_1, dim=0), "(n_batches n_scenes n_targets n_pred) hidden_dim -> (n_batches n_scenes n_pred) (n_targets hidden_dim)", 
+                    n_batches=n_batches, n_targets=2, n_pred=6,
+                )
+                
+                nrc1_hidden_states_0_32 = nrc1_feature_collapse(torch.cat(self.hidden_states_0, dim=0), dim_output=32) # 2x 16 DCT coeffs
+                nrc1_hidden_states_0_272 = nrc1_feature_collapse(torch.cat(self.hidden_states_0, dim=0), dim_output=272) # 2x 16 DCT coeffs + 3x 80 density params
+                nrc1_hidden_states_1_32 = nrc1_feature_collapse(torch.cat(self.hidden_states_1, dim=0), dim_output=32)
+                nrc1_hidden_states_1_272 = nrc1_feature_collapse(torch.cat(self.hidden_states_1, dim=0), dim_output=272)
+                
+                nrc1_hidden_states_1_pairwise_64 = nrc1_feature_collapse(hidden_states_1_pairwise, dim_output=64) # 2x 2x 16 DCT coeffs
+                nrc1_hidden_states_1_pairwise_544 = nrc1_feature_collapse(hidden_states_1_pairwise, dim_output=544)
+                
+                self.log(
+                    "val/nrc1_hidden_states_0_32",
+                    nrc1_hidden_states_0_32,
+                    sync_dist=True,
+                )
+                self.log(
+                    "val/nrc1_hidden_states_1_32",
+                    nrc1_hidden_states_1_32,
+                    sync_dist=True,
+                )
+                self.log(
+                    "val/nrc1_hidden_states_0_272",
+                    nrc1_hidden_states_0_272,
+                    sync_dist=True,
+                )
+                self.log(
+                    "val/nrc1_hidden_states_1_272",
+                    nrc1_hidden_states_1_272,
+                    sync_dist=True,
+                )
+                self.log(
+                    "val/nrc1_hidden_states_1_pairwise_64",
+                    nrc1_hidden_states_1_pairwise_64,
+                    sync_dist=True,
+                )
+                self.log(
+                    "val/nrc1_hidden_states_1_pairwise_544",
+                    nrc1_hidden_states_1_pairwise_544,
+                    sync_dist=True,
+                )
+                
+                # Empty buffers
+                self.hidden_states_0 = []
+                self.hidden_states_1 = []
 
     def test_step(self, batch: Dict[str, Tensor], batch_idx: int) -> Dict:
          # ! map can be empty for some scenes, check batch["map/valid"]
