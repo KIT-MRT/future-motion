@@ -54,6 +54,7 @@ model:
     use_vmap: True
     n_dct_coeffs: 16
     dct_only_for_pos: True
+    mlp_reencoder_without_dct: True
 
 train_metric:
   _target_: hptr_modules.models.metrics.nll.NllMetrics
