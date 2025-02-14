@@ -406,7 +406,7 @@ class DualDecoder(nn.Module):
             if return_last_hidden_state:
                 conf_0, pred_0, last_hidden_state_0 = self.mlp_decoders[0](valid, motion_emb_0, target_type, return_last_hidden_state=True)
             else:
-                conf_0, pred_0 = self.[0](valid, motion_emb_0, target_type)
+                conf_0, pred_0 = self.mlp_decoders[0](valid, motion_emb_0, target_type)
         
         
         if self.n_dct_coeffs:
