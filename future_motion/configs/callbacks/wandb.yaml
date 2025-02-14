@@ -1,5 +1,5 @@
 model_checkpoint:
-  _target_: hptr.callbacks.wandb_callbacks.ModelCheckpointWB
+  _target_: hptr_modules.callbacks.wandb_callbacks.ModelCheckpointWB
   dirpath: "checkpoints/"
   filename: "{epoch:02d}"
   monitor: "val/loss" # name of the logged metric which determines when model is improving

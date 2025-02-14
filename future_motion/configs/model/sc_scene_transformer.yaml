@@ -35,7 +35,7 @@ model:
     n_layer_tf_tl: 1
     n_layer_tf_agent: 3
   decoder:
-    _target_: future_motion.models.sc_global.Decoder
+    _target_: hptr_modules.models.sc_global.Decoder
     n_pred: 6
     tf_n_layer: 2
     k_reinforce_tl: 2
@@ -66,7 +66,7 @@ model:
     use_vmap: True
 
 train_metric:
-  _target_: hptr.models.metrics.nll.NllMetrics
+  _target_: hptr_modules.models.metrics.nll.NllMetrics
   winner_takes_all: joint_hard1 # hard1 # none, or (joint) + hard + (1-6), or cmd
   l_pos: nll_torch # nll_torch, nll_mtr, huber, l2
   p_rand_train_agent: -1 # 0.2
@@ -79,16 +79,16 @@ train_metric:
   w_spd: [1.0, 1.0, 1.0]
 
 waymo_metric:
-  _target_: hptr.models.metrics.waymo.WaymoMetrics
+  _target_: hptr_modules.models.metrics.waymo.WaymoMetrics
   n_max_pred_agent: 8
 
 pre_processing:
   scene_centric:
-    _target_: hptr.data_modules.scene_centric.SceneCentricPreProcessing
+    _target_: hptr_modules.data_modules.scene_centric.SceneCentricPreProcessing
     gt_in_local: True
     mask_invalid: False
   global:
-    _target_: hptr.data_modules.sc_global.SceneCentricGlobal
+    _target_: hptr_modules.data_modules.sc_global.SceneCentricGlobal
     dropout_p_history: -1
     use_current_tl: True
     add_ohe: True
@@ -100,20 +100,20 @@ pre_processing:
 
 post_processing:
   to_dict:
-    _target_: hptr.data_modules.post_processing.ToDict
+    _target_: hptr_modules.data_modules.post_processing.ToDict
     predictions: ${...model.decoder.mlp_head.predictions}
   get_cov_mat:
-    _target_: hptr.data_modules.post_processing.GetCovMat
+    _target_: hptr_modules.data_modules.post_processing.GetCovMat
     rho_clamp: 5.0
     std_min: -1.609
     std_max: 5.0
   waymo:
-    _target_: hptr.data_modules.waymo_post_processing.WaymoPostProcessing
+    _target_: hptr_modules.data_modules.waymo_post_processing.WaymoPostProcessing
     k_pred: 6
     use_ade: True
     score_temperature: -1
     mpa_nms_thresh: [2.5, 1.0, 2.0] # veh, ped, cyc
-    mtr_nms_thresh: [] 
+    mtr_nms_thresh: []
     gt_in_local: ${...pre_processing.scene_centric.gt_in_local}
 
 # * optimizer
@@ -126,7 +126,7 @@ lr_scheduler:
   step_size: 25
 
 sub_womd:
-  _target_: hptr.utils.submission.SubWOMD
+  _target_: hptr_modules.utils.submission.SubWOMD
   activate: False
   method_name: METHOD_NAME
   authors: [NAME1, NAME2]
@@ -135,5 +135,5 @@ sub_womd:
   method_link: METHOD_LINK
   account_name: ACCOUNT_NAME
 sub_av2:
-  _target_: hptr.utils.submission.SubAV2
+  _target_: hptr_modules.utils.submission.SubAV2
   activate: False

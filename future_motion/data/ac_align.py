@@ -3,7 +3,7 @@ import torch
 from typing import Dict
 from torch import nn, Tensor
 from omegaconf import DictConfig
-from hptr.utils.pose_pe import PosePE
+from hptr_modules.utils.pose_pe import PosePE
 
 from einops import rearrange
 from einops.layers.torch import Rearrange

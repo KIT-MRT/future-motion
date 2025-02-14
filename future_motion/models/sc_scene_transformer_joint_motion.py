@@ -7,9 +7,9 @@ from einops import repeat, rearrange
 
 from typing import List, Tuple
 
-from hptr.models.modules.mlp import MLP
-from hptr.models.modules.rpe import get_rel_dist
-from hptr.models.sc_global import SceneCentricGlobal
+from hptr_modules.models.modules.mlp import MLP
+from hptr_modules.models.modules.rpe import get_rel_dist
+from hptr_modules.models.sc_global import SceneCentricGlobal
 
 from future_motion.models.modules.local_attn import LocalEncoder  # opt. rename to LocalAttnBlock / Module
 

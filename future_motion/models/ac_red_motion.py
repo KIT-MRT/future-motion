@@ -11,11 +11,11 @@ from vit_pytorch.cross_vit import CrossTransformer
 
 from future_motion.models.modules.local_attn import LocalEncoder
 
-from hptr.models.modules.mlp import MLP
-from hptr.models.modules.point_net import PointNet
-from hptr.models.modules.transformer import TransformerBlock
-from hptr.models.modules.decoder_ensemble import DecoderEnsemble
-from hptr.models.modules.multi_modal import MultiModalAnchors
+from hptr_modules.models.modules.mlp import MLP
+from hptr_modules.models.modules.point_net import PointNet
+from hptr_modules.models.modules.transformer import TransformerBlock
+from hptr_modules.models.modules.decoder_ensemble import DecoderEnsemble
+from hptr_modules.models.modules.multi_modal import MultiModalAnchors
 
 
 class RedMotion(nn.Module):

@@ -1,6 +1,6 @@
 import torch
 
-from hptr.data_modules.ac_global import AgentCentricGlobal
+from hptr_modules.data_modules.ac_global import AgentCentricGlobal
 
 
 class AgentCentricSceneMotion(AgentCentricGlobal):

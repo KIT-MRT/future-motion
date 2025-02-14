@@ -7,8 +7,8 @@ from einops import rearrange
 from torch import nn, Tensor
 from omegaconf import DictConfig
 
-from hptr.models.modules.transformer import TransformerBlock
-from hptr.models.modules.decoder_ensemble import DecoderEnsemble
+from hptr_modules.models.modules.transformer import TransformerBlock
+from hptr_modules.models.modules.decoder_ensemble import DecoderEnsemble
 
 from future_motion.models.ac_wayformer import InputProjections
 from future_motion.models.ac_red_motion import ReductionDecoder
