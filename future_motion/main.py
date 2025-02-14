@@ -73,7 +73,7 @@ class FutureMotion(LightningModule):
         # print(f"{pred_1_global = }")
         # print(f"{edit_pred_0 = }")
         # print(f"{agent_0_as_global_ref = }")
-        # print(f"{measure_neural_regression_collapse = }")
+        print(f"{measure_neural_regression_collapse = }")
 
         # pre_processing
         self.pre_processing = []
@@ -232,7 +232,7 @@ class FutureMotion(LightningModule):
         elif self.hparams.dbl_decoding:
             pred_dict_0 = copy.deepcopy(pred_dict)
             
-            pred_dict_0["pred_valid"], pred_dict_0["pred_conf"], pred_dict_0["pred"], pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"], pred_dict["to_predict"] = (
+            pred_dict_0["pred_valid"], pred_dict_0["pred_conf"], pred_dict_0["pred"], pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"], pred_dict["to_predict"], last_hidden_state_0, last_hidden_state_1 = (
                 self.model(
                     **input_dict, 
                     ref_role=pred_dict["ref_role"],
@@ -508,7 +508,7 @@ class FutureMotion(LightningModule):
         elif self.hparams.dbl_decoding:
             pred_dict_0 = copy.deepcopy(pred_dict)
             
-            pred_dict_0["pred_valid"], pred_dict_0["pred_conf"], pred_dict_0["pred"], pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"], pred_dict["to_predict"] = (
+            pred_dict_0["pred_valid"], pred_dict_0["pred_conf"], pred_dict_0["pred"], pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"], pred_dict["to_predict"], last_hidden_state_0, last_hidden_state_1 = (
                 self.model(
                     **input_dict,
                     ref_role=pred_dict["ref_role"],
@@ -714,7 +714,7 @@ class FutureMotion(LightningModule):
         if self.hparams.dbl_decoding:
             pred_dict_0 = copy.deepcopy(pred_dict)
             
-            motion_tokens_0, retokenized_motion, pred_dict_0["pred_valid"], pred_dict_0["pred_conf"], pred_dict_0["pred"], pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"], pred_dict["to_predict"] = (
+            pred_dict_0["pred_valid"], pred_dict_0["pred_conf"], pred_dict_0["pred"], pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"], pred_dict["to_predict"], last_hidden_state_0, last_hidden_state_1 = (
                 self.model(
                     **input_dict,
                     ref_role=pred_dict["ref_role"],

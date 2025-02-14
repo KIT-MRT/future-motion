@@ -233,7 +233,7 @@ class RetroMotion(nn.Module):
         emb = rearrange(scene_emb, "n_scene (n_agent n_token) ... -> (n_scene n_agent) n_token ...", n_scene=n_scene, n_agent=n_agent, n_token=red_emb.shape[1])
         emb_invalid = rearrange(scene_emb_invalid, "n_scene (n_agent n_token) -> (n_scene n_agent) n_token", n_scene=n_scene, n_agent=n_agent)
         
-        conf_0, pred_0, valid_1, conf_1, pred_1, to_predict_1 = self.motion_decoder(
+        conf_0, pred_0, valid_1, conf_1, pred_1, to_predict_1, last_hidden_state_0, last_hidden_state_1 = self.motion_decoder(
             valid=valid, target_type=target_type, emb=emb, emb_invalid=emb_invalid,
             ref_pos=kwargs["ref_pos"], ref_rot=kwargs["ref_rot"], ref_role=kwargs["ref_role"],
             freeze_decoder_0=freeze_enc_and_dec_0,
@@ -263,7 +263,7 @@ class RetroMotion(nn.Module):
         assert torch.isfinite(conf_1).all()
         assert torch.isfinite(pred_1).all()
         
-        return valid, conf_0[None, ...], pred_0[None, ...], valid_1, conf_1[None, ...], pred_1[None, ...], to_predict_1 # Add n_decoder dim
+        return valid, conf_0[None, ...], pred_0[None, ...], valid_1, conf_1[None, ...], pred_1[None, ...], to_predict_1, last_hidden_state_0, last_hidden_state_1
     
     
 class DualDecoder(nn.Module):
@@ -367,7 +367,6 @@ class DualDecoder(nn.Module):
         pred_1_global: bool = False,
         pred_1_skip_context: bool = False,
         agent_0_as_global_ref: bool = False,
-        return_last_hidden_state: bool = False,
     ) -> Tuple[Tensor, Tensor]:
         """
         Args:
@@ -403,10 +402,8 @@ class DualDecoder(nn.Module):
             # [n_scene, n_target, n_pred, hidden_dim]
             motion_emb_0 = motion_embs.view(valid.shape[0], valid.shape[1], self.n_pred, self.hidden_dim)
             
-            if return_last_hidden_state:
-                conf_0, pred_0, last_hidden_state_0 = self.mlp_decoders[0](valid, motion_emb_0, target_type, return_last_hidden_state=True)
-            else:
-                conf_0, pred_0 = self.mlp_decoders[0](valid, motion_emb_0, target_type)
+            conf_0, pred_0, last_hidden_state_0 = self.mlp_decoders[0](valid, motion_emb_0, target_type, return_last_hidden_state=True)
+            # conf_0, pred_0 = self.mlp_decoders[0](valid, motion_emb_0, target_type)
         
         
         if self.n_dct_coeffs:
@@ -579,7 +576,7 @@ class DualDecoder(nn.Module):
             motion_embs_1, _ = self.transformer_blocks[2](src=motion_embs_local, tgt=emb, tgt_padding_mask=emb_invalid)
         
         motion_emb_1 = motion_embs_1.view(valid.shape[0], valid.shape[1], self.n_pred, self.hidden_dim)
-        conf_1, pred_1 = self.mlp_decoders[1](valid, motion_emb_1, target_type)
+        conf_1, pred_1, last_hidden_state_1 = self.mlp_decoders[1](valid, motion_emb_1, target_type, return_last_hidden_state=True)
         
         if self.n_dct_coeffs:
             if self.dct_only_for_pos:
@@ -629,14 +626,10 @@ class DualDecoder(nn.Module):
     
         if additive_decoding:
             pred_1 = pred_0[..., :2, :, :, :] + pred_1
-
-            return conf_0, pred_0, valid, conf_1, pred_1, to_predict
         
-        if return_last_hidden_state:
-            return conf_0, pred_0, valid, conf_1, pred_1, to_predict, last_hidden_state_0
-            
+        # if return_last_hidden_state:
+        return conf_0, pred_0, valid, conf_1, pred_1, to_predict, last_hidden_state_0, last_hidden_state_1
         
-        return conf_0, pred_0, valid, conf_1, pred_1, to_predict
             
     
         
