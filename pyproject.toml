@@ -31,10 +31,4 @@ Documentation = "https://github.com/KIT-MRT/future-motion/blob/main/README.md"
 Repository = "https://github.com/KIT-MRT/future-motion"
 
 [tool.setuptools]
-package-dir = {"" = "future_motion"}  # Maps the top-level directory to the src folder
-
-[tool.setuptools.packages.find]
-where = ["future_motion"]  # Look for modules in the src folder
-include = ["future_motion*"]
-[tool.setuptools.dynamic]
-version = { attr = "future_motion.__version__" }
+packages = ["future_motion"]
