@@ -408,15 +408,6 @@ class DualDecoder(nn.Module):
             else:
                 conf_0, pred_0 = self.detokenizers[0](valid, motion_emb_0, target_type)
         
-        # print(f"{pred_0.shape = }") # pred_0.shape = torch.Size([16, 8, 6, 272, 1])
-        # print(f"{last_hidden_state_0.shape = }") # last_hidden_state_0.shape = torch.Size([768, 512])
-        # time.sleep(100)
-        # [n_decoder, n_scene, n_agent, n_pred, n_step_future, 2] in local coordinate (x,y, yaw...)
-        # pred_0.shape = torch.Size([1, 8, 6, 80, 5])
-        
-        # back to global
-        # RuntimeError: The size of tensor a (6) must match the size of tensor b (8) at non-singleton dimension 2
-        # pred_0_pos = pred_0[..., :2][None, ...]
         
         if self.n_dct_coeffs:
             if self.dct_only_for_pos:
@@ -424,28 +415,19 @@ class DualDecoder(nn.Module):
                 n_scene, n_target, n_pred, pred_dim, _ = pred_0.shape
                 pred_0_dct = torch.zeros((n_scene, n_target, n_pred, pred_dim, self.n_step_future * 2), device=pred_0.device)
                 pred_0_dct[..., :self.n_dct_coeffs * 2] = pred_0[..., :self.n_dct_coeffs * 2]
-                # print(f"{pred_0.shape = }")
                 
                 pred_0_dct = rearrange(pred_0_dct, "... 1 (n_step_future xy) ->  ... xy n_step_future", xy=2)
-                # print(f"{pred_0_dct.shape = }")
-                # print(f"{pred_0_dct[0, 0, 0, 0, :] = }")
+
                 
                 # Inverse discrete cosine transform: n_dct_coeffs -> n_step_future
                 pred_0_pos = self.linear_idct(pred_0_dct)
                 
-                # print(f"{pred_0_pos.shape = }")
                 pred_0_density = pred_0[..., self.n_dct_coeffs * 2:]
                 pred_0_density = rearrange(pred_0_density, "... 1 (n_step_future params) -> ... params n_step_future", n_step_future=self.n_step_future)
-                # print(f"{pred_0_density.shape = }")
                 
                 
                 pred_0 = torch.cat((pred_0_pos, pred_0_density), dim=-2)
-                # print(f"{pred_0.shape = }")
                 pred_0 = rearrange(pred_0, "... pred_dim n_step_future -> ... n_step_future pred_dim")
-                # print(f"{pred_0.shape = }")
-                
-                
-                # time.sleep(100)
             else:
                 pred_0 = rearrange(pred_0, "... n_dct_coeffs pred_dim -> ... pred_dim n_dct_coeffs")
                 n_scene, n_target, n_pred, pred_dim, _ = pred_0.shape
@@ -491,13 +473,8 @@ class DualDecoder(nn.Module):
         
         if agent_0_as_global_ref:
             # transform all forecasts to local reference frame of agent 0 
-            # print(f"{ref_pos.shape = }")# [6, 8, 1, 2]
-            # print(f"{ref_rot.shape = }")
-            
             # 2 steps all to global, then all to agent 0's ref frame, later opt simplify and combine to one operation by multiplying the matrices? prob. less intuitive
             pred_0_global = torch_pos2global(pred_0_pos.flatten(2, 3), ref_pos, ref_rot)
-            # print(f"{pred_0_global.shape = }") # [6, 8, 480, 2]
-            
             n_agent = ref_pos.shape[1]
             
             # row-major order in pytorch
@@ -505,11 +482,7 @@ class DualDecoder(nn.Module):
             ref_rot_agent_0 = repeat(ref_rot[:, 0:1], "n_scene 1 row col -> n_scene n_agent row col", n_agent=n_agent)
             
             # global in view of agent 0
-            # pred_0_global = torch_pos2local(pred_0_global.flatten(2, 3), ref_pos_agent_0, ref_rot_agent_0)
             pred_0_global = torch_pos2local(pred_0_global, ref_pos_agent_0, ref_rot_agent_0)
-            # print(f"{pred_0_global.shape = }") #[6, 8, 480, 2]
-            
-            # time.sleep(100)
         else: 
             pred_0_global = torch_pos2global(pred_0_pos.flatten(2, 3), ref_pos, ref_rot)
         
@@ -517,13 +490,6 @@ class DualDecoder(nn.Module):
         
         # concat Gaussian covs
         pred_0_global = torch.concat((pred_0_global, pred_0[..., 2:]), dim=-1)
-        
-        # # debug
-        # pred_0_global = torch.zeros_like(pred_0_global)
-        
-        # print(f"{pred_0_global.shape = }")
-              
-        # time.sleep(100)
         
         if self.n_dct_coeffs and not self.retokenizer_without_dct:
             if self.dct_only_for_pos:
@@ -536,25 +502,18 @@ class DualDecoder(nn.Module):
                 pred_0_global_density = rearrange(pred_0[..., 2:], "... n_step_future dim -> ... (n_step_future dim) 1")
                 
                 pred_0_global = torch.cat((pred_0_global_pos, pred_0_global_density), dim=-2)
-                # print(f"{pred_0_global.shape = }")
-                # time.sleep(100)
             else:
                 pred_0_global = rearrange(pred_0_global, "... n_step_future pred_dim -> ... pred_dim n_step_future")
                 pred_0_global = self.linear_dct(pred_0_global)[..., :self.n_dct_coeffs]
                 pred_0_global = rearrange(pred_0_global, "... pred_dim n_dct_coeffs -> ... n_dct_coeffs pred_dim")
                 
         
-        # print(f"{pred_0.shape = }")
-        # pred_0.shape = torch.Size([6, 8, 6, 80, 5])
         # Also concat pred conf? -> no not meaningful in a joint sense, therefore let the model "relearn"/ regenerate that
         pred_0_tokenlike = rearrange(pred_0_global, "n_scene n_target n_pred n_timesteps pred_dim -> (n_scene n_target) n_pred (n_timesteps pred_dim)")
         valid_tokenlike = rearrange(valid, "n_scene n_agent -> (n_scene n_agent)")
         valid_tokenlike = repeat(valid_tokenlike, "... -> ... n_pred", n_pred=self.n_pred)
-        # time.sleep(100)
         
-        # retokenized_motion.shape = torch.Size([48, 6, 256])
         retokenized_motion = self.retokenizer(pred_0_tokenlike, valid_tokenlike)
-        # print(f"{retokenized_motion.shape = }") # torch.Size([8, 6, 256])
         
         # global attn across all agents and modes (n_traget, n_pred)
         n_scene, n_target, *_ = pred_0.shape
@@ -576,87 +535,28 @@ class DualDecoder(nn.Module):
                 
                 # print(f"{ref_role[..., 1]}") # targets with interactive behavior are always at index 0, 1 in train set
                 # https://waymo.com/open/data/motion/tfexample object of interest = with interactive behavior
-                # time.sleep(100)
-                
-                # valid_only_interactive = True
-                
-                # valid_base = torch.clone(valid)
-                
 
-                
-                # dbl check why this is not working somehow the same idx twice is still possible
-                
-                # # print(f"{to_predict.shape = }")
-                # rand_to_predict = torch.randint(low=0, high=n_target, size=(n_scene, 2), device=pred_0.device) # can become twotimes the same index -> only one to predict
-                # idx = torch.tensor((0, 1), device=pred_0.device)
-                
-                # rand_to_predict = rand_to_predict + idx
-                # # print(f"{rand_to_predict.shape = }")
-                # # time.sleep(100)
-                
-                # max_rand_to_predict = reduce(rand_to_predict, "b n -> b", "max")
-                
-                # # time.sleep(100)
-                
-                # rand_to_predict = rand_to_predict - torch.clamp(max_rand_to_predict[..., None] - (n_target - 1), min=0) 
-                
-                # # print(f"{rand_to_predict.shape = }")
-                # # print(f"{rand_to_predict.dtype = }")
-                
-                # # time.sleep(100)
-                
-                # to_predict = torch.zeros(to_predict.shape, dtype=torch.bool, device=to_predict.device)
-                # batch_range = torch.arange(n_scene, device=pred_0.device)[:, None]
-                # to_predict[batch_range, rand_to_predict] = True # why needed and to_predict[rand_to_predict] doesn't work?
-                # # print(f"{to_predict.shape = }")
-                # # print(f"{rand_to_predict[0] = }")
-                # # print(f"{to_predict[0] = }")
-
-            # motion_tokens_global = rearrange(retokenized_motion, "(n_scene n_target) n_pred hidden_dim -> n_scene (n_target n_pred) hidden_dim", n_scene=n_scene)
             motion_tokens_global = rearrange(retokenized_motion, "(n_scene n_target) n_pred hidden_dim -> n_scene n_target n_pred hidden_dim", n_scene=n_scene)
-            # print(f"{motion_tokens_global.shape = }")
             
             
             motion_tokens_global = motion_tokens_global[to_predict]
-            # print(f"{motion_tokens_global.shape = }")
             motion_tokens_global = rearrange(motion_tokens_global, "(n_scene n_role_to_predict) n_pred hidden_dim -> n_scene (n_role_to_predict n_pred) hidden_dim", n_scene=n_scene)
-            # print(f"{motion_tokens_global.shape = }")
             
-            # print(f"{valid_tokenlike.shape = }")
             valid_tokenlike = rearrange(valid_tokenlike, "(n_scene n_target) n_pred -> n_scene n_target n_pred", n_scene=n_scene)
             valid_tokenlike = valid_tokenlike[to_predict]
-            # valid_tokenlike = rearrange(valid_tokenlike, "(n_scene n_role_to_predict) n_pred -> n_scene n_role_to_predict n_pred", n_scene=n_scene)
-            # print(f"{valid_tokenlike.shape = }")
-            
-            
-            
-            # print(f"{emb_invalid.shape = }")
-            # print(f"{emb.shape = }")
             
             emb_invalid = rearrange(emb_invalid, "(n_scene n_target) ... -> n_scene n_target ...", n_scene=n_scene)
             emb = rearrange(emb, "(n_scene n_target) ... -> n_scene n_target ...", n_scene=n_scene)
-            # print(f"{emb_invalid.shape = }")
             emb_invalid = emb_invalid[to_predict]
             emb = emb[to_predict]
-            # print(f"{emb_invalid.shape = }")
-            
-            # print(f"{valid.shape = }")
-            
             
             valid = valid[to_predict]
             valid = rearrange(valid, "(n_scene n_role_to_predict) -> n_scene n_role_to_predict", n_scene=n_scene)
-            # print(f"{valid.shape = }")
-            
-            
-            # time.sleep(100)
         else:
             motion_tokens_global = rearrange(retokenized_motion, "(n_scene n_target) n_pred hidden_dim -> n_scene (n_target n_pred) hidden_dim", n_scene=n_scene)
         
-        # print(f"{motion_tokens_global.shape = }") # torch.Size([1, (8 x 6), 256])
-        
         valid_tokenlike_global = rearrange(valid_tokenlike, "(n_scene n_target) n_pred -> n_scene (n_target n_pred)", n_scene=n_scene)
         motion_tokens_global, _ = self.transformer_blocks[1](src=motion_tokens_global, tgt=motion_tokens_global, tgt_padding_mask=valid_tokenlike_global)
-        # time.sleep(100)
         
         # local alignment with scene context - map traffic light states etc.
          
@@ -666,21 +566,12 @@ class DualDecoder(nn.Module):
         else:
             if agent_0_as_global_ref:
                 # TODO: only use scene embedding of agent 0 as context for all agents (used as global yet learned data-effient encoder is reused for other agent-centric views as well (for mraginal preds))
-                # print(f"{emb.shape = }") # [12, 130, 256] # n_batch for pairwise_joint 2 * n_scene (2 * 6)
-                # print(f"{emb_invalid.shape = }") # [12, 130]
-                
-                # for pairwise joint later for more
-                # assert pairwise_joint, "agent_0_as_global is only implemented for pairwise_joint case"
-                
                 emb = rearrange(emb, "(n_scene n_joint_agents) ... -> n_scene n_joint_agents ...", n_scene=n_scene)
                 emb_invalid = rearrange(emb_invalid, "(n_scene n_joint_agents) ... -> n_scene n_joint_agents ...", n_scene=n_scene)
-                # print(f"{emb.shape = }")
                 n_joint_agents = emb.shape[1]
                 
                 emb = repeat(emb[:, 0:1], "n_scene 1 ... -> n_scene n_joint_agents ...", n_joint_agents=n_joint_agents)
                 emb_invalid = repeat(emb_invalid[:, 0:1], "n_scene 1 ... -> n_scene n_joint_agents ...", n_joint_agents=n_joint_agents)
-                # print(f"{emb.shape = }")
-                # print(f"{emb_invalid.shape = }")
                 
                 emb = rearrange(emb, "n_scene n_joint_agents ... -> (n_scene n_joint_agents) ...")
                 emb_invalid = rearrange(emb_invalid, "n_scene n_joint_agents ... -> (n_scene n_joint_agents) ...")
@@ -698,7 +589,6 @@ class DualDecoder(nn.Module):
                 pred_1_dct[..., :self.n_dct_coeffs * 2] = pred_1[..., :self.n_dct_coeffs * 2]
                 
                 pred_1_dct = rearrange(pred_1_dct, "... 1 (n_step_future xy) ->  ... xy n_step_future", xy=2)
-                # print(f"{pred_1_dct[0, 0, 0, 0, :] = }")
                 
                 # Inverse discrete cosine transform: n_dct_coeffs -> n_step_future
                 pred_1_pos = self.linear_idct(pred_1_dct)
@@ -709,8 +599,6 @@ class DualDecoder(nn.Module):
                 
                 pred_1 = torch.cat((pred_1_pos, pred_1_density), dim=-2)
                 pred_1 = rearrange(pred_1, "... pred_dim n_step_future -> ... n_step_future pred_dim")
-                # print(f"{pred_1.shape = }")
-                # time.sleep(100)
             else:
                 pred_1 = rearrange(pred_1, "... n_dct_coeffs pred_dim -> ... pred_dim n_dct_coeffs")
                 n_scene, n_target, n_pred, pred_dim, _ = pred_1.shape
@@ -721,66 +609,26 @@ class DualDecoder(nn.Module):
                 pred_1 = self.linear_idct(pred_1_dct)
                 pred_1 = rearrange(pred_1, "... pred_dim n_step_future -> ... n_step_future pred_dim")
             
-        
-        # time.sleep(100) 
-        
-        # opt. implement
-        # if valid_only_interactive:
-        #     valid = valid_base * ref_role[..., 1].any(dim=-1)[..., None] # compute loss only for interacting agents
-        
         if agent_0_as_global_ref:
-            # TODO: back to per-agent local here
-            
-            # to global from agent 0's view
+            # back to per-agent local
             pred_1_pos = pred_1[..., :2]
             _pred_1_global = torch_pos2global(pred_1_pos.flatten(2, 3), ref_pos_agent_0[:, :n_joint_agents], ref_rot_agent_0[:, :n_joint_agents])
-            # print(f"{pred_1_global.shape = }") # [6, 8, 480, 2]
-            # print(f"{pred_0_global.shape = }") # [6, 8, 6, 80, 2]
             
             # to local views of all agents ("regular ones")
             pred_1_local = torch_pos2local(_pred_1_global, ref_pos[:, :n_joint_agents], ref_rot[:, :n_joint_agents])
-            # print(f"{pred_1_local.shape = }") # [6, 8, 480, 2]
             
             pred_1_local = rearrange(pred_1_local, "n_scene n_agent (n_pred n_step_future) xy -> n_scene n_agent n_pred n_step_future xy", n_pred=self.n_pred)
             pred_1 = torch.concat((pred_1_local, pred_1[..., 2:]), dim=-1) # pos/loc + scale params
-            
-            # time.sleep(100)
-             
         
         if pred_1_global:
-            # print(f"{pred_1.shape = }")
             pred_1_pos = pred_1[..., :2]
-            # print(f"{pred_1_pos.shape = }")
-            # print(f"{ref_pos.shape = }")
-            # print(f"{ref_rot.shape = }")
             
-            # time.sleep(100)
             pred_1_local = torch_pos2local(pred_1_pos.flatten(2, 3), ref_pos[:, :2], ref_rot[:, :2])
             pred_1_local = rearrange(pred_1_local, "n_scene n_agent (n_pred n_step_future) xy -> n_scene n_agent n_pred n_step_future xy", n_pred=self.n_pred)
             pred_1 = torch.concat((pred_1_local, pred_1[..., 2:]), dim=-1)
-            # print(f"{pred_1.shape = }")
-            
-            # print(f"pred_1 transformed back to local ref frame")
     
         if additive_decoding:
-            # print("using additive decoding")
-            # dbl check if it is always the first two also for the validation split
-                    
-            # print(f"{pred_1.max() = }")
-            # print(f"{pred_1.mean() = }")
-            
-            # print(f"{pred_1[0, 0, 0, :10] = }")
-            
-                
-
-            
             pred_1 = pred_0[..., :2, :, :, :] + pred_1
-            
-            
-            # # # debug
-            # # pred_1 = torch.zeros_like(pred_1)
-            # # print(f"{pred_1.shape = }")
-            # time.sleep(100)
 
             return conf_0, pred_0, valid, conf_1, pred_1, motion_tokens, retokenized_motion, to_predict
         
