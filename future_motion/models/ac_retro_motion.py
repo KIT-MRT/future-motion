@@ -233,7 +233,7 @@ class RetroMotion(nn.Module):
         emb = rearrange(scene_emb, "n_scene (n_agent n_token) ... -> (n_scene n_agent) n_token ...", n_scene=n_scene, n_agent=n_agent, n_token=red_emb.shape[1])
         emb_invalid = rearrange(scene_emb_invalid, "n_scene (n_agent n_token) -> (n_scene n_agent) n_token", n_scene=n_scene, n_agent=n_agent)
         
-        conf_0, pred_0, valid_1, conf_1, pred_1, motion_tokens, retokenized_motion, to_predict_1 = self.motion_decoder(
+        conf_0, pred_0, valid_1, conf_1, pred_1, to_predict_1 = self.motion_decoder(
             valid=valid, target_type=target_type, emb=emb, emb_invalid=emb_invalid,
             ref_pos=kwargs["ref_pos"], ref_rot=kwargs["ref_rot"], ref_role=kwargs["ref_role"],
             freeze_decoder_0=freeze_enc_and_dec_0,
@@ -263,7 +263,7 @@ class RetroMotion(nn.Module):
         assert torch.isfinite(conf_1).all()
         assert torch.isfinite(pred_1).all()
         
-        return motion_tokens, retokenized_motion, valid, conf_0[None, ...], pred_0[None, ...], valid_1, conf_1[None, ...], pred_1[None, ...], to_predict_1 # Add n_decoder dim
+        return valid, conf_0[None, ...], pred_0[None, ...], valid_1, conf_1[None, ...], pred_1[None, ...], to_predict_1 # Add n_decoder dim
     
     
 class DualDecoder(nn.Module):
@@ -630,13 +630,13 @@ class DualDecoder(nn.Module):
         if additive_decoding:
             pred_1 = pred_0[..., :2, :, :, :] + pred_1
 
-            return conf_0, pred_0, valid, conf_1, pred_1, motion_tokens, retokenized_motion, to_predict
+            return conf_0, pred_0, valid, conf_1, pred_1, to_predict
         
         if return_last_hidden_state:
-            return conf_0, pred_0, valid, conf_1, pred_1, motion_tokens, retokenized_motion, to_predict, last_hidden_state_0
+            return conf_0, pred_0, valid, conf_1, pred_1, to_predict, last_hidden_state_0
             
         
-        return conf_0, pred_0, valid, conf_1, pred_1, motion_tokens, retokenized_motion, to_predict
+        return conf_0, pred_0, valid, conf_1, pred_1, to_predict
             
     
         

@@ -232,7 +232,7 @@ class FutureMotion(LightningModule):
         elif self.hparams.dbl_decoding:
             pred_dict_0 = copy.deepcopy(pred_dict)
             
-            motion_tokens_0, retokenized_motion, pred_dict_0["pred_valid"], pred_dict_0["pred_conf"], pred_dict_0["pred"], pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"], pred_dict["to_predict"] = (
+            pred_dict_0["pred_valid"], pred_dict_0["pred_conf"], pred_dict_0["pred"], pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"], pred_dict["to_predict"] = (
                 self.model(
                     **input_dict, 
                     ref_role=pred_dict["ref_role"],
@@ -508,7 +508,7 @@ class FutureMotion(LightningModule):
         elif self.hparams.dbl_decoding:
             pred_dict_0 = copy.deepcopy(pred_dict)
             
-            motion_tokens_0, retokenized_motion, pred_dict_0["pred_valid"], pred_dict_0["pred_conf"], pred_dict_0["pred"], pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"], pred_dict["to_predict"] = (
+            pred_dict_0["pred_valid"], pred_dict_0["pred_conf"], pred_dict_0["pred"], pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"], pred_dict["to_predict"] = (
                 self.model(
                     **input_dict,
                     ref_role=pred_dict["ref_role"],
@@ -529,18 +529,6 @@ class FutureMotion(LightningModule):
                 
                 # to_predict = pred_dict["ref_role"][..., 2]
                 to_predict = pred_dict["to_predict"]
-                
-                # prob rename to emb as well later
-                motion_tokens_0 = rearrange(motion_tokens_0, "(n_scene n_target) ... -> n_scene n_target ...", n_scene=n_scene)
-                motion_tokens_0 = motion_tokens_0[to_predict]
-                
-                retokenized_motion = rearrange(retokenized_motion, "(n_scene n_target) ... -> n_scene n_target ...", n_scene=n_scene)
-                
-                # TODO: rename to motion_emb_1
-                if retokenized_motion.shape[1] != 2:
-                    retokenized_motion = retokenized_motion[to_predict]
-                else:
-                    retokenized_motion = rearrange(retokenized_motion, "b m n d -> (b m) n d")
                 
                 conf_0 = pred_dict_0['pred_conf'][to_predict[None, ...]] # For extra n_dec dimenion
                 
@@ -572,14 +560,11 @@ class FutureMotion(LightningModule):
             )
             
             if self.hparams.measure_neural_regression_collapse:
-                # self.hidden_states_0.append(motion_tokens_0)
                 self.hidden_states_0.append(last_hidden_state_0)
-                self.hidden_states_1.append(retokenized_motion)
+                # self.hidden_states_1.append(retokenized_motion)
             
             if self.hparams.save_path_hidden_states_dbl_decoding:
-                torch.save(motion_tokens_0, f"{self.hparams.save_path_hidden_states_dbl_decoding}/hidden_states_0_batch_{batch_idx:04}.pt")
                 torch.save(pred_dict_0, f"{self.hparams.save_path_hidden_states_dbl_decoding}/pred_dict_0_batch_{batch_idx:04}.pt")
-                torch.save(retokenized_motion, f"{self.hparams.save_path_hidden_states_dbl_decoding}/hidden_states_1_batch_{batch_idx:04}.pt")
         else:
             pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"] = (
                 self.model(
