@@ -59,7 +59,7 @@ model:
 train_metric:
   _target_: hptr_modules.models.metrics.nll.NllMetrics
   winner_takes_all: joint_hard1 # none, or (joint) + hard + (1-6), or cmd
-  l_pos: nll_torch # nll_exp_power_like # nll_torch, nll_mtr, huber, l2
+  l_pos: nll_exp_power_like # nll_torch, nll_mtr, huber, l2
   p_rand_train_agent: -1 # 0.2
   n_step_add_train_agent: [-1, -1, -1] # -1 to turn off
   focal_gamma_conf: [0.0, 0.0, 0.0] # 0.0 to turn off
@@ -73,7 +73,7 @@ train_metric:
 train_metric_0:
   _target_: hptr_modules.models.metrics.nll.NllMetrics
   winner_takes_all: hard1 # none, or (joint) + hard + (1-6), or cmd
-  l_pos: nll_torch # nll_exp_power_like # nll_torch, nll_mtr, huber, l2
+  l_pos: nll_exp_power_like # nll_torch, nll_mtr, huber, l2
   p_rand_train_agent: -1 # 0.2
   n_step_add_train_agent: [-1, -1, -1] # -1 to turn off
   focal_gamma_conf: [0.0, 0.0, 0.0] # 0.0 to turn off
