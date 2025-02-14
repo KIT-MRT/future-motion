@@ -1,4 +1,4 @@
-_target_: future_motion.future_motion.FutureMotion
+_target_: future_motion.main.FutureMotion
 
 time_step_current: 49
 time_step_end: 109
