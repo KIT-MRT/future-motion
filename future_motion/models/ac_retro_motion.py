@@ -280,7 +280,7 @@ class DualDecoder(nn.Module):
         n_dct_coeffs: int = 0,
         dct_only_for_pos: bool = False,
         use_fan_layer: bool = False,
-        retokenizer_without_dct: bool = False,
+        mlp_reencoder_without_dct: bool = False,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -288,11 +288,11 @@ class DualDecoder(nn.Module):
         self.n_pred = n_pred
         self.n_dct_coeffs = n_dct_coeffs
         self.dct_only_for_pos = dct_only_for_pos
-        self.retokenizer_without_dct = retokenizer_without_dct # TODO: dbl check tokenizer/ embedding layer naming etc. not tokenization as in MotionLM nor as in LLMs
+        self.mlp_reencoder_without_dct = mlp_reencoder_without_dct # TODO: dbl check tokenizer/ embedding layer naming etc. not tokenization as in MotionLM nor as in LLMs
         
         print(f"{use_fan_layer = }")
         print(f"{dct_only_for_pos = }")
-        print(f"{retokenizer_without_dct = }")
+        print(f"{mlp_reencoder_without_dct = }")
 
         
         self.motion_anchors = MultiModalAnchors(
@@ -337,7 +337,7 @@ class DualDecoder(nn.Module):
             print(f"{n_dct_coeffs = }")
         
         # unembed 
-        self.detokenizers = nn.ModuleList((
+        self.mlp_decoders = nn.ModuleList((
             MLPHead(hidden_dim=hidden_dim, use_vmap=use_vmap, n_pred=n_pred, dct_only_for_pos=dct_only_for_pos, **mlp_head),
             MLPHead(hidden_dim=hidden_dim, use_vmap=use_vmap, n_pred=n_pred, dct_only_for_pos=dct_only_for_pos, **mlp_head),
         ))
@@ -348,13 +348,13 @@ class DualDecoder(nn.Module):
         n_timesteps = 80
         pred_dim = 5 # assuming "cov3" TODO: read from config
         
-        if retokenizer_without_dct:
-            self.retokenizer = MLP(
+        if mlp_reencoder_without_dct:
+            self.mlp_reencoder = MLP(
                 fc_dims=[n_timesteps * pred_dim, _d, _d, hidden_dim],
             )
         else:
-            self.retokenizer = MLP(
-                fc_dims=[self.detokenizers[0].mlp_pred._decoders[0].output_dim, _d, _d, hidden_dim],
+            self.mlp_reencoder = MLP(
+                fc_dims=[self.mlp_decoders[0].mlp_pred._decoders[0].output_dim, _d, _d, hidden_dim],
             )
 
     # rename emb to context emb, and anchors to anchor_emb
@@ -380,7 +380,7 @@ class DualDecoder(nn.Module):
             conf: [n_scene, n_target, n_pred]
             pred: [n_scene, n_target, n_pred, n_step_future, pred_dim]
         """
-        # Freeze anchors and detokenizers/ unembed as well?
+        # Freeze anchors and mlp_decoders/ unembed as well?
         if freeze_decoder_0:
             with torch.no_grad():
                 # print("frozen dec 0")
@@ -392,7 +392,7 @@ class DualDecoder(nn.Module):
                 
                 # [n_scene, n_target, n_pred, hidden_dim]
                 motion_emb_0 = motion_tokens.view(valid.shape[0], valid.shape[1], self.n_pred, self.hidden_dim)
-                conf_0, pred_0 = self.detokenizers[0](valid, motion_emb_0, target_type)
+                conf_0, pred_0 = self.mlp_decoders[0](valid, motion_emb_0, target_type)
         else:
             # [n_batch, n_pred, hidden_dim]
             motion_anchors = self.motion_anchors(valid.flatten(0, 1), emb, target_type.flatten(0, 1))
@@ -404,9 +404,9 @@ class DualDecoder(nn.Module):
             motion_emb_0 = motion_tokens.view(valid.shape[0], valid.shape[1], self.n_pred, self.hidden_dim)
             
             if return_last_hidden_state:
-                conf_0, pred_0, last_hidden_state_0 = self.detokenizers[0](valid, motion_emb_0, target_type, return_last_hidden_state=True)
+                conf_0, pred_0, last_hidden_state_0 = self.mlp_decoders[0](valid, motion_emb_0, target_type, return_last_hidden_state=True)
             else:
-                conf_0, pred_0 = self.detokenizers[0](valid, motion_emb_0, target_type)
+                conf_0, pred_0 = self.[0](valid, motion_emb_0, target_type)
         
         
         if self.n_dct_coeffs:
@@ -491,7 +491,7 @@ class DualDecoder(nn.Module):
         # concat Gaussian covs
         pred_0_global = torch.concat((pred_0_global, pred_0[..., 2:]), dim=-1)
         
-        if self.n_dct_coeffs and not self.retokenizer_without_dct:
+        if self.n_dct_coeffs and not self.mlp_reencoder_without_dct:
             if self.dct_only_for_pos:
                 pred_0_global_pos = pred_0_global[..., :2]
                 pred_0_global_pos = rearrange(pred_0_global_pos, "... n_step_future pred_dim -> ... pred_dim n_step_future")
@@ -513,7 +513,7 @@ class DualDecoder(nn.Module):
         valid_tokenlike = rearrange(valid, "n_scene n_agent -> (n_scene n_agent)")
         valid_tokenlike = repeat(valid_tokenlike, "... -> ... n_pred", n_pred=self.n_pred)
         
-        retokenized_motion = self.retokenizer(pred_0_tokenlike, valid_tokenlike)
+        retokenized_motion = self.mlp_reencoder(pred_0_tokenlike, valid_tokenlike)
         
         # global attn across all agents and modes (n_traget, n_pred)
         n_scene, n_target, *_ = pred_0.shape
@@ -579,7 +579,7 @@ class DualDecoder(nn.Module):
             motion_tokens_1, _ = self.transformer_blocks[2](src=motion_tokens_local, tgt=emb, tgt_padding_mask=emb_invalid)
         
         motion_emb_1 = motion_tokens_1.view(valid.shape[0], valid.shape[1], self.n_pred, self.hidden_dim)
-        conf_1, pred_1 = self.detokenizers[1](valid, motion_emb_1, target_type)
+        conf_1, pred_1 = self.mlp_decoders[1](valid, motion_emb_1, target_type)
         
         if self.n_dct_coeffs:
             if self.dct_only_for_pos:
