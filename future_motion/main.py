@@ -70,12 +70,12 @@ class FutureMotion(LightningModule):
         
         print(f"{pairwise_joint = }")
         print(f"{eval_pairwise_joint = }")
-        # print(f"{measure_dct_reconstruction_error = }")
-        # print(f"{loss_weight_dbl_decoding = }")
-        # print(f"{additive_decoding = }")
-        # print(f"{pred_1_global = }")
-        # print(f"{edit_pred_0 = }")
-        # print(f"{agent_0_as_global_ref = }")
+        print(f"{measure_dct_reconstruction_error = }")
+        print(f"{loss_weight_dbl_decoding = }")
+        print(f"{additive_decoding = }")
+        print(f"{pred_1_global = }")
+        print(f"{edit_pred_0 = }")
+        print(f"{agent_0_as_global_ref = }")
         print(f"{measure_neural_regression_collapse = }")
 
         # pre_processing
