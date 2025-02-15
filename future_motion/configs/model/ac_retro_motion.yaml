@@ -10,9 +10,11 @@ plot_motion: False
 dbl_decoding: True
 pairwise_joint: True
 loss_weight_dbl_decoding: 0.5
+agent_0_as_global_ref: True
 
 model:
   _target_: future_motion.models.ac_retro_motion.RetroMotion
+  add_context_pos_enc: True
   hidden_dim: 256
   n_decoders: 1
   joint: True
@@ -155,7 +157,7 @@ optimizer:
 lr_scheduler:
   _target_: torch.optim.lr_scheduler.StepLR
   gamma: 0.5
-  step_size: 20
+  step_size: 40
 
 sub_womd:
   _target_: hptr_modules.utils.submission.SubWOMD
