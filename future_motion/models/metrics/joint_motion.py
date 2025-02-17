@@ -3,7 +3,7 @@ import torch.nn.functional as F
 
 from torch import Tensor
 
-from .barlow_twins import get_barlow_twins_loss
+from future_motion.models.metrics.barlow_twins import get_barlow_twins_loss
 
 
 def get_joint_motion_loss(

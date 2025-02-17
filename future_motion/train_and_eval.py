@@ -20,7 +20,7 @@ def download_checkpoint(loggers, wb_ckpt) -> None:
         artifact_dir = artifact.download("ckpt")
 
 
-@hydra.main(config_path="../configs/", config_name="base.yaml")
+@hydra.main(config_path="./configs/", config_name="base.yaml")
 def main(config: DictConfig) -> None:
 
     seed_everything(config.seed, workers=True)

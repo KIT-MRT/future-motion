@@ -1,4 +1,4 @@
-_target_: future_motion.FutureMotion 
+_target_: future_motion.main.FutureMotion
 
 time_step_current: 49
 time_step_end: 109
@@ -9,7 +9,7 @@ inference_repeat_n: 1
 plot_motion: False
 
 model:
-  _target_: models.ac_scene_motion.SceneMotion
+  _target_: future_motion.models.ac_scene_motion.SceneMotion
   hidden_dim: 256
   n_decoders: 1
   tf_cfg:
@@ -32,7 +32,7 @@ model:
   latent_context_module:
     n_layer: 6
   motion_decoder:
-    _target_: models.ac_wayformer.Decoder
+    _target_: future_motion.models.ac_wayformer.Decoder
     n_decoder_layers: 8 
     n_pred: 6
     multi_modal_anchors:
@@ -52,7 +52,7 @@ model:
 
 
 train_metric:
-  _target_: external_submodules.hptr.src.models.metrics.nll.NllMetrics
+  _target_: hptr_modules.models.metrics.nll.NllMetrics
   winner_takes_all: hard1 # none, or (joint) + hard + (1-6), or cmd
   l_pos: nll_torch # nll_torch, nll_mtr, huber, l2
   p_rand_train_agent: -1 # 0.2
@@ -65,12 +65,12 @@ train_metric:
   w_spd: [0, 0, 0]
 
 waymo_metric:
-  _target_: external_submodules.hptr.src.models.metrics.waymo.WaymoMetrics
+  _target_: hptr_modules.models.metrics.waymo.WaymoMetrics
   n_max_pred_agent: 8
 
 pre_processing:
   agent_centric:
-    _target_: external_submodules.hptr.src.data_modules.agent_centric.AgentCentricPreProcessing
+    _target_: hptr_modules.data_modules.agent_centric.AgentCentricPreProcessing
     mask_invalid: False
     n_target: 8
     n_other: 48
@@ -89,15 +89,15 @@ pre_processing:
 
 post_processing:
   to_dict:
-    _target_: external_submodules.hptr.src.data_modules.post_processing.ToDict
+    _target_: hptr_modules.data_modules.post_processing.ToDict
     predictions: ${...model.motion_decoder.mlp_head.predictions}
   get_cov_mat:
-    _target_: external_submodules.hptr.src.data_modules.post_processing.GetCovMat
+    _target_: hptr_modules.data_modules.post_processing.GetCovMat
     rho_clamp: 5.0
     std_min: -1.609
     std_max: 5.0
   waymo:
-    _target_: external_submodules.hptr.src.data_modules.waymo_post_processing.WaymoPostProcessing
+    _target_: hptr_modules.data_modules.waymo_post_processing.WaymoPostProcessing
     k_pred: 6
     use_ade: True
     score_temperature: 0.5 # Improves Brier-minFDE, but worsens mAP
@@ -115,7 +115,7 @@ lr_scheduler:
   step_size: 20
 
 sub_womd:
-  _target_: external_submodules.hptr.src.utils.submission.SubWOMD
+  _target_: hptr_modules.utils.submission.SubWOMD
   activate: False
   method_name: METHOD_NAME
   authors: [NAME1, NAME2]
@@ -124,5 +124,5 @@ sub_womd:
   method_link: METHOD_LINK
   account_name: ACCOUNT_NAME
 sub_av2:
-  _target_: external_submodules.hptr.src.utils.submission.SubAV2
+  _target_: hptr_modules.utils.submission.SubAV2
   activate: False

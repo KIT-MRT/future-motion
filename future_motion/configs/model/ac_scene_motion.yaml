@@ -1,24 +1,23 @@
-_target_: future_motion.FutureMotion
+_target_: future_motion.main.FutureMotion
 
 time_step_current: 10
 time_step_end: 90
 n_video_batch: 3
-interactive_challenge: False
+interactive_challenge: True
 inference_cache_map: False
 inference_repeat_n: 1
 plot_motion: False
 
 model:
-  _target_: models.ac_wayformer.Wayformer
+  _target_: future_motion.models.ac_scene_motion.SceneMotion
   hidden_dim: 256
   n_decoders: 1
-  pred_subsampling_rate: 2 # We resample at 5Hz.
   tf_cfg:
     n_head: 4
     dropout_p: 0.1
     norm_first: True
     bias: True
-  input_projections:
+  local_encoder:
     add_learned_pe: True
     use_point_net: False
     n_layer_mlp: 3
@@ -27,21 +26,17 @@ model:
       use_layernorm: False
       use_batchnorm: False
       dropout_p: null
-  early_fusion_encoder:
-    n_latent_query: 192
-    n_encoder_layers: 2
-    use_shared_tf_encoder: False # True: (cross + self) * n, False: cross + self * n
-    latent_query:
-        use_agent_type: False
-        mode_emb: none # linear, mlp, add, none
-        mode_init: xavier # uniform, xavier
-        scale: 5.0
-  decoder:
-    _target_: models.ac_wayformer.Decoder
+  reduction_decoder:
+    n_descriptors: 128
+    n_layer_tf_all2all: 4
+  latent_context_module:
+    n_layer: 6
+  motion_decoder:
+    _target_: future_motion.models.ac_wayformer.Decoder
     n_decoder_layers: 8 
-    n_pred: 64 # 6 e2e without NMS
+    n_pred: 6
     multi_modal_anchors:
-      use_agent_type: True
+      use_agent_type: False # Opt, test with as well
       mode_emb: none # linear, mlp, add, none
       mode_init: xavier # uniform, xavier
       scale: 5.0
@@ -55,10 +50,11 @@ model:
       n_step_future: 80
     use_vmap: True
 
+
 train_metric:
-  _target_: external_submodules.hptr.src.models.metrics.nll.NllMetrics
-  winner_takes_all: hard1 # none, or (joint) + hard + (1-6), or cmd
-  l_pos: nll_torch # nll_torch, nll_mtr, nll_and_l1_mtr, huber, l2
+  _target_: hptr_modules.models.metrics.nll.NllMetrics
+  winner_takes_all: joint_hard1 # none, or (joint) + hard + (1-6), or cmd
+  l_pos: nll_torch # nll_torch, nll_mtr, huber, l2
   p_rand_train_agent: -1 # 0.2
   n_step_add_train_agent: [-1, -1, -1] # -1 to turn off
   focal_gamma_conf: [0.0, 0.0, 0.0] # 0.0 to turn off
@@ -69,19 +65,19 @@ train_metric:
   w_spd: [0, 0, 0]
 
 waymo_metric:
-  _target_: external_submodules.hptr.src.models.metrics.waymo.WaymoMetrics
+  _target_: hptr_modules.models.metrics.waymo.WaymoMetrics
   n_max_pred_agent: 8
 
 pre_processing:
   agent_centric:
-    _target_: external_submodules.hptr.src.data_modules.agent_centric.AgentCentricPreProcessing
+    _target_: hptr_modules.data_modules.agent_centric.AgentCentricPreProcessing
     mask_invalid: False
     n_target: 8
     n_other: 48
-    n_map: 512
+    n_map: 128 # 512
     n_tl: 24
   ac_global:
-    _target_: external_submodules.hptr.src.data_modules.ac_global.AgentCentricGlobal
+    _target_: future_motion.data.ac_scene_motion.AgentCentricSceneMotion
     dropout_p_history: 0.15
     use_current_tl: False
     add_ohe: True
@@ -93,41 +89,40 @@ pre_processing:
 
 post_processing:
   to_dict:
-    _target_: external_submodules.hptr.src.data_modules.post_processing.ToDict
-    predictions: ${...model.decoder.mlp_head.predictions}
+    _target_: hptr_modules.data_modules.post_processing.ToDict
+    predictions: ${...model.motion_decoder.mlp_head.predictions}
   get_cov_mat:
-    _target_: external_submodules.hptr.src.data_modules.post_processing.GetCovMat
+    _target_: hptr_modules.data_modules.post_processing.GetCovMat
     rho_clamp: 5.0
     std_min: -1.609
     std_max: 5.0
   waymo:
-    _target_: external_submodules.hptr.src.data_modules.waymo_post_processing.WaymoPostProcessing
+    _target_: hptr_modules.data_modules.waymo_post_processing.WaymoPostProcessing
     k_pred: 6
     use_ade: True
     score_temperature: -1
-    # Use MTR NMS with n_pred > 6 and MPA NMS with n_pred = 6
-    mtr_nms_thresh: [2.5, 1.0, 2.0] # veh, ped, cyc
-    # mpa_nms_thresh: [2.5, 1.0, 2.0] # veh, ped, cyc
-    mpa_nms_thresh: [] # veh, ped, cyc 
+    mpa_nms_thresh: [2.5, 1.0, 2.0] # veh, ped, cyc
+    mtr_nms_thresh: []
     gt_in_local: True
 
+# * optimizer
 optimizer:
   _target_: torch.optim.AdamW
-  lr: 2e-4
+  lr: 2e-4 # 2e-4, 1e-5
 lr_scheduler:
   _target_: torch.optim.lr_scheduler.StepLR
   gamma: 0.5
-  step_size: 60
+  step_size: 20
 
 sub_womd:
-  _target_: external_submodules.hptr.src.utils.submission.SubWOMD
+  _target_: hptr_modules.utils.submission.SubWOMD
   activate: False
   method_name: METHOD_NAME
   authors: [NAME1, NAME2]
   affiliation: AFFILIATION
-  description: Open-source implementation of Wayformer
+  description: scr_womd
   method_link: METHOD_LINK
   account_name: ACCOUNT_NAME
 sub_av2:
-  _target_: external_submodules.hptr.src.utils.submission.SubAV2
+  _target_: hptr_modules.utils.submission.SubAV2
   activate: False

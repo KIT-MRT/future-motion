@@ -9,7 +9,7 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3
 export HYDRA_FULL_ERROR=1
 
 run() {
-    python -u src/train_and_eval.py \
+    python -u future-motion/future_motion/train_and_eval.py \
     trainer=womd \
     model="$1" \
     datamodule.batch_size=$BATCH_SIZE \

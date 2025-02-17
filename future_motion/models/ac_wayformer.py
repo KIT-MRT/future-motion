@@ -4,21 +4,17 @@ import torch.nn.functional as F
 
 from typing import Tuple
 from torch import nn, Tensor
+from einops import rearrange
 from omegaconf import DictConfig
 
-from einops import rearrange, repeat
-from vit_pytorch.cross_vit import CrossTransformer
-
-from .modules.local_attn import LocalEncoder
-
-from external_submodules.hptr.src.models.modules.mlp import MLP
-from external_submodules.hptr.src.models.modules.point_net import PointNet
-from external_submodules.hptr.src.models.modules.transformer import TransformerBlock
-from external_submodules.hptr.src.models.modules.decoder_ensemble import DecoderEnsemble
-from external_submodules.hptr.src.models.modules.multi_modal import MultiModalAnchors
+from hptr_modules.models.modules.mlp import MLP
+from hptr_modules.models.modules.point_net import PointNet
+from hptr_modules.models.modules.transformer import TransformerBlock
+from hptr_modules.models.modules.multi_modal import MultiModalAnchors
+from hptr_modules.models.modules.decoder_ensemble import DecoderEnsemble, MLPHead
 
 
-class RedMotion(nn.Module):
+class Wayformer(nn.Module):
     def __init__(
         self,
         hidden_dim: int,
@@ -32,7 +28,8 @@ class RedMotion(nn.Module):
         n_decoders: int,
         decoder: DictConfig,
         tf_cfg: DictConfig,
-        intra_class_encoder: DictConfig,
+        input_projections: DictConfig,
+        early_fusion_encoder: DictConfig,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -41,29 +38,33 @@ class RedMotion(nn.Module):
         self.pl_aggr = pl_aggr
         self.pred_subsampling_rate = kwargs.get("pred_subsampling_rate", 1)
         decoder["mlp_head"]["n_step_future"] = decoder["mlp_head"]["n_step_future"] // self.pred_subsampling_rate
-        
-        self.hidden_dim = hidden_dim
-        self.measure_neural_collapse = kwargs.get("measure_neural_collapse", False)
 
-        self.intra_class_encoder = IntraClassEncoder(
+        self.input_projections = InputProjections(
             hidden_dim=hidden_dim,
             agent_attr_dim=agent_attr_dim,
             map_attr_dim=map_attr_dim,
             tl_attr_dim=tl_attr_dim,
             pl_aggr=pl_aggr,
-            tf_cfg=tf_cfg,
             use_current_tl=use_current_tl,
             n_step_hist=n_step_hist,
             n_pl_node=n_pl_node,
-            measure_neural_collapse=self.measure_neural_collapse,
-            **intra_class_encoder,
+            **input_projections
+        )
+
+        self.encoder = EarlyFusionEncoder(
+            hidden_dim=hidden_dim,
+            tf_cfg=tf_cfg,
+            **early_fusion_encoder
         )
 
         decoder["tf_cfg"] = tf_cfg
         decoder["hidden_dim"] = hidden_dim
         self.decoder = DecoderEnsemble(n_decoders, decoder_cfg=decoder)
 
-        model_parameters = filter(lambda p: p.requires_grad, self.intra_class_encoder.parameters())
+        model_parameters = filter(lambda p: p.requires_grad, self.input_projections.parameters())
+        total_params = sum([np.prod(p.size()) for p in model_parameters])
+        print(f"Input projections parameters: {total_params/1000000:.2f}M")
+        model_parameters = filter(lambda p: p.requires_grad, self.encoder.parameters())
         total_params = sum([np.prod(p.size()) for p in model_parameters])
         print(f"Encoder parameters: {total_params/1000000:.2f}M")
         model_parameters = filter(lambda p: p.requires_grad, self.decoder.parameters())
@@ -83,7 +84,6 @@ class RedMotion(nn.Module):
         map_attr: Tensor,
         inference_repeat_n: int = 1,
         inference_cache_map: bool = False,
-        **kwargs,
     ) -> Tuple[Tensor, Tensor, Tensor]:
         """
         Args:
@@ -118,37 +118,23 @@ class RedMotion(nn.Module):
         """
         for _ in range(inference_repeat_n):
             valid = target_valid if self.pl_aggr else target_valid.any(-1)  # [n_scene, n_target]
+            target_emb, target_valid, other_emb, other_valid, tl_emb, tl_valid, map_emb, map_valid = self.input_projections(
+                target_valid=target_valid,
+                target_attr=target_attr,
+                other_valid=other_valid,
+                other_attr=other_attr,
+                map_valid=map_valid,
+                map_attr=map_attr,
+                tl_valid=tl_valid,
+                tl_attr=tl_attr,
+            )
 
-            if self.measure_neural_collapse:
-                emb, emb_invalid, target_embs = self.intra_class_encoder(
-                    target_valid=target_valid,
-                    target_attr=target_attr,
-                    other_valid=other_valid,
-                    other_attr=other_attr,
-                    map_valid=map_valid,
-                    map_attr=map_attr,
-                    tl_valid=tl_valid,
-                    tl_attr=tl_attr,
-                    valid=valid,
-                    target_type=target_type,
-                )
-            else:
-                emb, emb_invalid = self.intra_class_encoder(
-                    target_valid=target_valid,
-                    target_attr=target_attr,
-                    other_valid=other_valid,
-                    other_attr=other_attr,
-                    map_valid=map_valid,
-                    map_attr=map_attr,
-                    tl_valid=tl_valid,
-                    tl_attr=tl_attr,
-                    valid=valid,
-                    target_type=target_type,
-                )
+            fused_emb, fused_emb_invalid = self.encoder(
+                target_emb, target_valid, other_emb, other_valid, tl_emb, tl_valid, map_emb, map_valid, target_type, valid
+            )
 
-            conf, pred = self.decoder(valid=valid, target_type=target_type, emb=emb, emb_invalid=emb_invalid)
+            conf, pred = self.decoder(valid=valid, target_type=target_type, emb=fused_emb, emb_invalid=fused_emb_invalid)
 
-            # Add interpolation here (to invert subsampling)
             if self.pred_subsampling_rate != 1:
                 n_decoder, n_scene, n_target, n_pred, n_step_future, pred_dim = pred.shape
                 pred = rearrange(
@@ -164,14 +150,10 @@ class RedMotion(nn.Module):
 
         assert torch.isfinite(conf).all()
         assert torch.isfinite(pred).all()
-
-        if self.measure_neural_collapse:
-            return valid, conf, pred, target_embs
-        else:
-            return valid, conf, pred
+        return valid, conf, pred
 
 
-class IntraClassEncoder(nn.Module):
+class InputProjections(nn.Module):
     def __init__(
         self,
         hidden_dim: int,
@@ -181,14 +163,11 @@ class IntraClassEncoder(nn.Module):
         pl_aggr: bool,
         n_step_hist: int,
         n_pl_node: int,
-        tf_cfg: DictConfig,
         use_current_tl: bool,
         add_learned_pe: bool,
         use_point_net: bool,
         n_layer_mlp: int,
         mlp_cfg: DictConfig,
-        n_layer_tf: int,
-        **kwargs,
     ) -> None:
         super().__init__()
         self.pl_aggr = pl_aggr
@@ -221,62 +200,6 @@ class IntraClassEncoder(nn.Module):
             else:
                 self.pe_tl = nn.Parameter(torch.zeros([1, n_step_hist, 1, hidden_dim]), requires_grad=True)
 
-        if not (self.pl_aggr or self.use_point_net):  # singular token in this case
-            self.trajectory_encoder = nn.ModuleList(
-                [
-                    TransformerBlock(d_model=hidden_dim, d_feedforward=hidden_dim * 4, **tf_cfg)
-                    for _ in range(3)
-                ]
-            )
-        
-        self.red_decoder = ReductionDecoder(
-            hidden_dim=hidden_dim,
-            tf_cfg=tf_cfg,
-            n_descriptors=100,
-            n_layer_tf_all2all=3,
-        )
-
-        self.local_encoder = LocalEncoder(
-            n_blocks=3, # 6
-            dim=hidden_dim,
-            attn_window=16,   
-        )
-
-        self.cross_fusion_block = CrossTransformer(
-            sm_dim=hidden_dim,
-            lg_dim=hidden_dim,
-            depth=3, # 6 
-            heads=8,
-            dim_head=hidden_dim // 8,
-            dropout=0.1,
-        )
-        self.local_global_fusion_token = nn.Parameter(torch.randn(hidden_dim))
-        self.global_local_fusion_token = nn.Parameter(torch.randn(hidden_dim))
-
-        self.use_current_agent_state = kwargs.get("use_current_agent_state")
-        self.forward_local_emb = kwargs.get("forward_local_emb")
-        self.forward_red_emb = kwargs.get("forward_red_emb")
-        self.forward_tl_emb = kwargs.get("forward_tl_emb")
-
-        self.measure_neural_collapse = kwargs.get("measure_neural_collapse")
-
-        control_vectors_target_emb = kwargs.get("control_vectors_target_emb", '')
-        
-        if control_vectors_target_emb:
-            self.control_vectors_target_emb = torch.load(control_vectors_target_emb)
-        else:
-            self.control_vectors_target_emb = None
-
-        self.control_temperature = kwargs.get("control_temperature", 0)
-
-    def control_emb(self, emb, control_vector, temperature):
-        control_vector = repeat(control_vector, "hidden_dim -> b n_token hidden_dim", b=emb.shape[0], n_token=emb.shape[1])
-        
-        print(f"Controlling with tau = {temperature}")
-        emb = emb + control_vector * temperature
-
-        return emb
-
     def forward(
         self,
         target_valid: Tensor,
@@ -287,8 +210,9 @@ class IntraClassEncoder(nn.Module):
         map_attr: Tensor,
         tl_valid: Tensor,
         tl_attr: Tensor,
-        **kwargs,
-    ) -> Tuple[Tensor, Tensor]:
+    ) -> Tuple[
+        Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor
+    ]:
         """
         Args:
             # target history, other history, map
@@ -315,18 +239,18 @@ class IntraClassEncoder(nn.Module):
                     tl_attr: [n_scene, n_target, n_step_hist, n_tl, tl_attr_dim]
 
         Returns:
-            emb: [n_batch, n_emb, hidden_dim], n_batch = n_scene * n_target
-            emb_invalid: [n_batch, n_emb]
+            target_emb: [n_batch, 1 or n_step_hist, hidden_dim], n_batch = n_scene * n_target (agent-centric)
+            target_valid: [n_batch, 1 or n_step_hist]
+            other_emb: [n_batch, n_other or n_other * n_step_hist, hidden_dim]
+            other_valid: [n_batch, n_other or n_other * n_step_hist]
+            tl_emb: [n_batch, n_tl * n_step_hist, hidden_dim]
+            tl_valid: [n_batch, n_tl * n_step_hist]
+            map_emb: [n_batch, n_map or n_map * n_pl_node, hidden_dim]
+            map_valid: [n_batch, n_map or n_map * n_pl_node]
         """
-        # ! MLP and polyline subnet
         # [n_batch, n_step_hist/1, n_tl, tl_attr_dim]
         tl_valid = tl_valid.flatten(0, 1)
         tl_emb = self.fc_tl(tl_attr.flatten(0, 1), tl_valid)
-
-        # Only use current state of other agents -> no motion data required besides "own" history
-        if self.use_current_agent_state:
-            other_attr = other_attr[:, :, :, -1:]
-            other_valid = other_valid[:, :, :, -1:]
 
         if self.use_point_net:
             # [n_batch, n_map, map_attr_dim], [n_batch, n_map]
@@ -347,141 +271,164 @@ class IntraClassEncoder(nn.Module):
             # [n_batch, (n_step_hist), agent_attr_dim]
             target_valid = target_valid.flatten(0, 1)
             target_emb = self.fc_target(target_attr.flatten(0, 1), target_valid)
-        
-        # ! add learned PE
+
         if self.add_learned_pe:
             tl_emb = tl_emb + self.pe_tl
             map_emb = map_emb + self.pe_map
-
-            if self.use_current_agent_state:
-                other_emb = other_emb + self.pe_other[:, :, -1:] # can also be remove as it is temporal with only one time step.. maybe regularizes
-            else:
-                other_emb = other_emb + self.pe_other
-
+            other_emb = other_emb + self.pe_other
             target_emb = target_emb + self.pe_target
 
-        # ! flatten tokens
-        tl_emb = tl_emb.flatten(1, 2)  # [n_batch, (n_step_hist)*n_tl, :]
-        tl_valid = tl_valid.flatten(1, 2)  # [n_batch, (n_step_hist)*n_tl]
+        tl_emb = tl_emb.flatten(1, 2)  # [n_batch, n_step_hist * n_tl, :]
+        tl_valid = tl_valid.flatten(1, 2)  # [n_batch, n_step_hist * n_tl]
         if self.pl_aggr or self.use_point_net:
             target_emb = target_emb.unsqueeze(1)  # [n_batch, 1, :]
             target_valid = target_valid.unsqueeze(1)  # [n_batch, 1]
         else:
             # target_emb: [n_batch, n_step_hist/1, :], target_valid: [n_batch, n_step_hist/1]
-            map_emb = map_emb.flatten(1, 2)  # [n_batch, n_map*(n_pl_node), :]
-            map_valid = map_valid.flatten(1, 2)  # [n_batch, n_map*(n_pl_node)]
-            other_emb = other_emb.flatten(1, 2)  # [n_batch, n_other*(n_step_hist), :]
-            other_valid = other_valid.flatten(1, 2)  # [n_batch, n_other*(n_step_hist)]
-        
-        _target_invalid = ~target_valid
+            map_emb = map_emb.flatten(1, 2)  # [n_batch, n_map * n_pl_node, :]
+            map_valid = map_valid.flatten(1, 2)  # [n_batch, n_map * n_pl_node]
+            other_emb = other_emb.flatten(1, 2)  # [n_batch, n_other * n_step_hist, :]
+            other_valid = other_valid.flatten(1, 2)  # [n_batch, n_other * n_step_hist]
 
-        if self.measure_neural_collapse:
-            target_embs = []
-
-        for mod in self.trajectory_encoder:
-            target_emb, _ = mod(
-                src=target_emb, src_padding_mask=_target_invalid, tgt=target_emb, tgt_padding_mask=_target_invalid
-            )
-            if self.measure_neural_collapse:
-                target_embs.append(target_emb)
-
-        if self.control_vectors_target_emb is not None:
-            target_emb = self.control_emb(target_emb, self.control_vectors_target_emb.to(target_emb.device), temperature=self.control_temperature) # 32 100
-
-        env_emb = torch.cat([map_emb, other_emb], dim=1)
-        local_valid = torch.cat([map_valid, other_valid], dim=1)
-
-        local_emb = self.local_encoder(
-            x=env_emb,
-            mask=local_valid,
-        )
-        
-        red_emb = self.red_decoder(
-            emb=local_emb,
-            emb_invalid=~local_valid,
-            valid=kwargs["valid"],
+        return (
+            target_emb, target_valid,
+            other_emb, other_valid,
+            tl_emb, tl_valid,
+            map_emb, map_valid,
         )
 
-        red_valid = torch.ones(target_valid.shape[0], 100, device=red_emb.device, dtype=torch.bool) # 100 = num of RED tokens
 
-        n_batch = target_emb.shape[0]
-        local_fusion_tokens = repeat(self.local_global_fusion_token, "d -> b 1 d", b=n_batch)
-        global_fusion_tokens = repeat(self.global_local_fusion_token, "d -> b 1 d", b=n_batch)
-        
-        fused_local_emb = torch.cat([local_fusion_tokens, target_emb], dim=1)
-        fused_global_emb = torch.cat([global_fusion_tokens, red_emb], dim=1)
-
-        fused_local_emb, fused_global_emb = self.cross_fusion_block(
-            fused_local_emb, fused_global_emb
-        )
-        fused_emb = torch.cat([fused_local_emb, fused_global_emb[:, 0][:, None, :]], dim=1)
-        fused_valid = torch.ones(n_batch, fused_emb.shape[1], device=fused_emb.device, dtype=torch.bool)
-
-        emb = fused_emb
-        emb_valid = fused_valid
-
-        if self.forward_tl_emb:
-            emb = torch.cat([emb, tl_emb], dim=1)
-            emb_valid = torch.cat([emb_valid, tl_valid], dim=1)
-        if self.forward_local_emb:
-            emb = torch.cat([emb, local_emb], dim=1)
-            emb_valid = torch.cat([emb_valid, local_valid], dim=1)
-        if self.forward_red_emb:
-            emb = torch.cat([emb, red_emb], dim=1)
-            emb_valid = torch.cat([emb_valid, red_valid], dim=1)
-
-        emb_invalid = ~emb_valid
-
-        if self.measure_neural_collapse:
-            return emb, emb_invalid, target_embs
-        else:
-            return emb, emb_invalid
-
-
-class ReductionDecoder(nn.Module):
+class EarlyFusionEncoder(nn.Module):
     def __init__(
         self,
         hidden_dim: int,
         tf_cfg: DictConfig,
-        n_descriptors: int,
-        n_layer_tf_all2all: int,
-        red_mode: bool = False,
+        latent_query: DictConfig,
+        n_latent_query: int,
+        n_encoder_layers: int,
+        use_shared_tf_encoder: bool,
     ) -> None:
         super().__init__()
         self.hidden_dim = hidden_dim
-        self.n_layer_tf_all2all = n_layer_tf_all2all
-        self.n_descriptors = n_descriptors
-        self.red_mode = red_mode
+        self.n_encoder_layers = n_encoder_layers
+        self.n_latent_query = n_latent_query
+        self.use_shared_tf_encoder = use_shared_tf_encoder
 
-        self.learned_embs = MultiModalAnchors(
-            hidden_dim=hidden_dim, 
-            emb_dim=hidden_dim, 
-            n_pred=self.n_descriptors,
-            mode_emb="none",
-            mode_init="xavier",
-            scale=5.0,
-            use_agent_type=False, 
+        if self.n_encoder_layers > 0:
+            if self.n_latent_query > 0:
+                self.latent_query = MultiModalAnchors(
+                    hidden_dim=hidden_dim, emb_dim=hidden_dim, n_pred=self.n_latent_query, **latent_query
+                )
+                if self.use_shared_tf_encoder:
+                    self.tf_latent_query = TransformerBlock(
+                        d_model=hidden_dim,
+                        d_feedforward=hidden_dim * 4,
+                        n_layer=n_encoder_layers,
+                        decoder_self_attn=True,
+                        **tf_cfg,
+                    )
+                else:
+                    self.tf_latent_cross = TransformerBlock(
+                        d_model=hidden_dim, d_feedforward=hidden_dim * 4, n_layer=1, **tf_cfg
+                    )
+                    self.tf_latent_self = TransformerBlock(
+                        d_model=hidden_dim, d_feedforward=hidden_dim * 4, n_layer=n_encoder_layers, **tf_cfg
+                    )
+            else:
+                self.tf_self_attn = TransformerBlock(
+                    d_model=hidden_dim, d_feedforward=hidden_dim * 4, n_layer=n_encoder_layers, **tf_cfg
+                )
+
+    def forward(
+        self,
+        target_emb, target_valid,
+        other_emb, other_valid,
+        tl_emb, tl_valid,
+        map_emb, map_valid,
+        target_type, valid,
+    ) -> Tuple[Tensor, Tensor]:
+        """
+        Args:
+            target_emb: [n_batch, 1 or n_step_hist, hidden_dim], n_batch = n_scene * n_target (agent-centric)
+            target_valid: [n_batch, 1 or n_step_hist]
+            other_emb: [n_batch, n_other or n_other * n_step_hist, hidden_dim]
+            other_valid: [n_batch, n_other or n_other * n_step_hist]
+            tl_emb: [n_batch, n_tl * n_step_hist, hidden_dim]
+            tl_valid: [n_batch, n_tl * n_step_hist]
+            map_emb: [n_batch, n_map or n_map * n_pl_node, hidden_dim]
+            map_valid: [n_batch, n_map or n_map * n_pl_node] 
+            target_type: [n_scene, n_target, 3], bool one_hot [Vehicle=0, Pedestrian=1, Cyclist=2]
+            valid: [n_scene, n_target]
+
+        Returns:
+            emb: [n_scene * n_target, :, hidden_dim]
+            emb_invalid: [n_scene * n_target, :]
+        """
+        emb = torch.cat([target_emb, other_emb, tl_emb, map_emb], dim=1)
+        emb_invalid = ~torch.cat([target_valid, other_valid, tl_valid, map_valid], dim=1)
+
+        if self.n_encoder_layers > 0:
+            if self.n_latent_query > 0:
+                # [n_scene * n_agent, n_latent_query, out_dim]
+                lq_emb = self.latent_query(valid.flatten(0, 1), None, target_type.flatten(0, 1))
+                if self.use_shared_tf_encoder:
+                    emb, _ = self.tf_latent_query(src=lq_emb, tgt=emb, tgt_padding_mask=emb_invalid)
+                else:
+                    emb, _ = self.tf_latent_cross(src=lq_emb, tgt=emb, tgt_padding_mask=emb_invalid)
+                    emb, _ = self.tf_latent_self(src=emb, tgt=emb)
+                emb_invalid = (~valid).flatten(0, 1).unsqueeze(-1).expand(-1, lq_emb.shape[1])
+            else:
+                emb, _ = self.tf_self_attn(src=emb, tgt=emb, tgt_padding_mask=emb_invalid)
+
+        return emb, emb_invalid
+    
+
+class Decoder(nn.Module):
+    def __init__(
+        self,
+        hidden_dim: int,
+        n_pred: int,
+        use_vmap: bool,
+        mlp_head: DictConfig,
+        multi_modal_anchors: DictConfig,
+        tf_cfg: DictConfig,
+        n_decoder_layers: int,
+        anchor_self_attn: bool,
+    ) -> None:
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.n_pred = n_pred
+        self.anchors = MultiModalAnchors(
+            hidden_dim=hidden_dim, emb_dim=hidden_dim, n_pred=n_pred, **multi_modal_anchors
         )
-
-        self.decoder = TransformerBlock(
+        self.tf_anchor = TransformerBlock(
             d_model=hidden_dim,
             d_feedforward=hidden_dim * 4,
-            n_layer=n_layer_tf_all2all,
-            decoder_self_attn=True,
+            n_layer=n_decoder_layers,
+            decoder_self_attn=anchor_self_attn,
             **tf_cfg,
         )
+        self.mlp_head = MLPHead(hidden_dim=hidden_dim, use_vmap=use_vmap, n_pred=n_pred, **mlp_head)
 
-    def forward(self, valid: Tensor, emb: Tensor, emb_invalid: Tensor) -> Tuple[Tensor, Tensor]:
+    def forward(self, valid: Tensor, target_type: Tensor, emb: Tensor, emb_invalid: Tensor) -> Tuple[Tensor, Tensor]:
         """
         Args:
             valid: [n_scene, n_target]
-            emb_invalid: [n_scene*n_target, :]
-            emb: [n_scene*n_target, :, hidden_dim]
+            emb_invalid: [n_scene * n_target, :]
+            emb: [n_scene * n_target, :, hidden_dim]
+            target_type: [n_scene, n_target, 3], bool one_hot [Vehicle=0, Pedestrian=1, Cyclist=2]
 
         Returns:
-            reduced_emb: [n_scene, n_target, n_descriptors]
+            conf: [n_scene, n_target, n_pred]
+            pred: [n_scene, n_target, n_pred, n_step_future, pred_dim]
         """
-        reduced_emb = self.learned_embs(valid.flatten(0, 1), None, None)
-        reduced_emb, _ = self.decoder(src=reduced_emb, tgt=emb, tgt_padding_mask=emb_invalid)
-        
-        return reduced_emb
+        # [n_batch, n_pred, hidden_dim]
+        anchors = self.anchors(valid.flatten(0, 1), emb, target_type.flatten(0, 1))
+        # [n_batch, n_pred, hidden_dim]
+        emb, _ = self.tf_anchor(src=anchors, tgt=emb, tgt_padding_mask=emb_invalid)
+        # [n_scene, n_target, n_pred, hidden_dim]
+        emb = emb.view(valid.shape[0], valid.shape[1], self.n_pred, self.hidden_dim)
+
+        conf, pred = self.mlp_head(valid, emb, target_type)
+
+        return conf, pred
