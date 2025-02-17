@@ -240,7 +240,7 @@ class RetroMotion(nn.Module):
                         n_batch=n_batch,
                     )
 
-                scene_emb = scene_emb + context_pos_enc
+                    scene_emb = scene_emb + context_pos_enc
 
                 scene_emb, _ = self.latent_context_module(
                     src=scene_emb, tgt=scene_emb, tgt_padding_mask=scene_emb_invalid
