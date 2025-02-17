@@ -21,8 +21,8 @@ cd motion_forecasting_ws
 ```
 2. Clone this repository and our adapted version of `HPTR`:
 ```bash
-git clone git@github.com:KIT-MRT/future-motion.git
-git clone git@github.com:KIT-MRT/hptr.git
+git clone https://github.com/KIT-MRT/future-motion.git
+git clone https://github.com/KIT-MRT/hptr.git
 ```
 3. Create a conda environment named `future-motion` with:
 ```bash
