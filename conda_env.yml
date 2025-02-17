@@ -385,3 +385,4 @@ dependencies:
     - waymo-open-dataset-tf-2-12-0==1.6.4
     - wrapt==1.12.1
     - torch-dct==0.1.6
+    - nc-toolbox @ git+https://github.com/felixsh/nc-toolbox
