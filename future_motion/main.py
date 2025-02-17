@@ -20,8 +20,17 @@ from torchmetrics.functional.regression import pearson_corrcoef, mean_squared_er
 from future_motion.models.modules.neural_collapse import OnlineLinearClassifier
 from future_motion.models.metrics.representation_eval import std_of_l2_normalized
 from future_motion.models.metrics.regression_collapse import nrc1_feature_collapse
-from future_motion.data.lang_labels import agent_dict, direction_dict, speed_dict, acceleration_dict
-from future_motion.data.plot_3d import plot_motion_forecasts, mplfig_to_npimage, tensor_dict_to_cpu
+from future_motion.data.lang_labels import (
+    agent_dict,
+    direction_dict,
+    speed_dict,
+    acceleration_dict,
+)
+from future_motion.data.plot_3d import (
+    plot_motion_forecasts,
+    mplfig_to_npimage,
+    tensor_dict_to_cpu,
+)
 
 
 class FutureMotion(LightningModule):
@@ -52,8 +61,8 @@ class FutureMotion(LightningModule):
         loss_weight_dbl_decoding: float = 0.25,
         train_metric_0: DictConfig = None,
         post_processing_0: DictConfig = None,
-        save_pred_0: bool = False, # dbl check whats actually used from here on 
-        save_path_hidden_states_dbl_decoding: str = '',
+        save_pred_0: bool = False,  # dbl check whats actually used from here on
+        save_path_hidden_states_dbl_decoding: str = "",
         freeze_enc_and_dec_0: bool = False,
         pairwise_joint: bool = False,
         eval_pairwise_joint: bool = False,
@@ -67,7 +76,7 @@ class FutureMotion(LightningModule):
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
-        
+
         print(f"{pairwise_joint = }")
         print(f"{eval_pairwise_joint = }")
         print(f"{measure_dct_reconstruction_error = }")
@@ -121,7 +130,7 @@ class FutureMotion(LightningModule):
             interactive_challenge=interactive_challenge,
             n_agent=data_size["agent/valid"][-1],
         )
-        
+
         if dbl_decoding:
             self.train_metric_0 = hydra.utils.instantiate(
                 train_metric_0,
@@ -134,7 +143,9 @@ class FutureMotion(LightningModule):
                 prefix="waymo_pred_0",
                 step_gt=time_step_end,
                 step_current=time_step_current,
-                interactive_challenge=True if "joint" in train_metric_0["winner_takes_all"] else False,
+                interactive_challenge=(
+                    True if "joint" in train_metric_0["winner_takes_all"] else False
+                ),
                 n_agent=data_size["agent/valid"][-1],
             )
 
@@ -142,11 +153,11 @@ class FutureMotion(LightningModule):
                 self.post_processing_0 = nn.Sequential(
                     *[hydra.utils.instantiate(v) for _, v in post_processing_0.items()]
                 )
-            else: # backwards compatibility
+            else:  # backwards compatibility
                 self.post_processing_0 = nn.Sequential(
                     *[hydra.utils.instantiate(v) for _, v in post_processing.items()]
                 )
-            
+
             self.hidden_states_0 = []
             self.hidden_states_1 = []
 
@@ -220,7 +231,7 @@ class FutureMotion(LightningModule):
         if self.hparams.pre_training:
             loss, agent_loss, map_loss, traffic_light_loss = self.model(**input_dict)
             self.log("train/loss", loss, sync_dist=True)
-            self.log("train/agent_loss", agent_loss, sync_dist=True) 
+            self.log("train/agent_loss", agent_loss, sync_dist=True)
             self.log("train/map_loss", map_loss, sync_dist=True)
             self.log("train/traffic_light_loss", traffic_light_loss, sync_dist=True)
             return loss
@@ -234,22 +245,32 @@ class FutureMotion(LightningModule):
             ) = self.model(**input_dict)
         elif self.hparams.dbl_decoding:
             pred_dict_0 = copy.deepcopy(pred_dict)
-            
-            pred_dict_0["pred_valid"], pred_dict_0["pred_conf"], pred_dict_0["pred"], pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"], pred_dict["to_predict"], last_hidden_state_0, last_hidden_state_1 = (
-                self.model(
-                    **input_dict, 
-                    ref_role=pred_dict["ref_role"],
-                    freeze_enc_and_dec_0=self.hparams.freeze_enc_and_dec_0,
-                    pairwise_joint=self.hparams.pairwise_joint,
-                    additive_decoding=self.hparams.additive_decoding,
-                    pred_1_global=self.hparams.pred_1_global,
-                    pred_1_skip_context=self.hparams.pred_1_skip_context,
-                    agent_0_as_global_ref=self.hparams.agent_0_as_global_ref,
-                )
+
+            (
+                pred_dict_0["pred_valid"],
+                pred_dict_0["pred_conf"],
+                pred_dict_0["pred"],
+                pred_dict["pred_valid"],
+                pred_dict["pred_conf"],
+                pred_dict["pred"],
+                pred_dict["to_predict"],
+                last_hidden_state_0,
+                last_hidden_state_1,
+            ) = self.model(
+                **input_dict,
+                ref_role=pred_dict["ref_role"],
+                freeze_enc_and_dec_0=self.hparams.freeze_enc_and_dec_0,
+                pairwise_joint=self.hparams.pairwise_joint,
+                additive_decoding=self.hparams.additive_decoding,
+                pred_1_global=self.hparams.pred_1_global,
+                pred_1_skip_context=self.hparams.pred_1_skip_context,
+                agent_0_as_global_ref=self.hparams.agent_0_as_global_ref,
             )
             pred_dict_0 = self.post_processing_0(pred_dict_0)
-            metrics_dict_0 = self.train_metric_0(**pred_dict_0, **gt_dict, current_epoch=self.current_epoch)
-            
+            metrics_dict_0 = self.train_metric_0(
+                **pred_dict_0, **gt_dict, current_epoch=self.current_epoch
+            )
+
             for k in metrics_dict_0.keys():
                 if (
                     ("error_" in k)
@@ -396,9 +417,13 @@ class FutureMotion(LightningModule):
                 )
 
             return metrics_dict[f"{self.train_metric.prefix}/loss"] + linear_loss
-        
+
         if self.hparams.dbl_decoding:
-            return metrics_dict[f"{self.train_metric.prefix}/loss"] + self.hparams.loss_weight_dbl_decoding * metrics_dict_0[f"{self.train_metric_0.prefix}/loss"]
+            return (
+                metrics_dict[f"{self.train_metric.prefix}/loss"]
+                + self.hparams.loss_weight_dbl_decoding
+                * metrics_dict_0[f"{self.train_metric_0.prefix}/loss"]
+            )
 
         return metrics_dict[f"{self.train_metric.prefix}/loss"]
 
@@ -415,11 +440,11 @@ class FutureMotion(LightningModule):
         if self.hparams.pre_training:
             loss, agent_loss, map_loss, traffic_light_loss = self.model(**input_dict)
             self.log("val/loss", loss, sync_dist=True)
-            self.log("val/agent_loss", agent_loss, sync_dist=True) 
+            self.log("val/agent_loss", agent_loss, sync_dist=True)
             self.log("val/map_loss", map_loss, sync_dist=True)
             self.log("val/traffic_light_loss", traffic_light_loss, sync_dist=True)
             return loss
-        
+
         if self.hparams.measure_neural_collapse:
             (
                 pred_dict["pred_valid"],
@@ -510,64 +535,93 @@ class FutureMotion(LightningModule):
                 )
         elif self.hparams.dbl_decoding:
             pred_dict_0 = copy.deepcopy(pred_dict)
-            
-            pred_dict_0["pred_valid"], pred_dict_0["pred_conf"], pred_dict_0["pred"], pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"], pred_dict["to_predict"], last_hidden_state_0, last_hidden_state_1 = (
-                self.model(
-                    **input_dict,
-                    ref_role=pred_dict["ref_role"],
-                    pairwise_joint=self.hparams.pairwise_joint,
-                    additive_decoding=self.hparams.additive_decoding,
-                    pred_1_global=self.hparams.pred_1_global,
-                    pred_1_skip_context=self.hparams.pred_1_skip_context,
-                    edit_pred_0=self.hparams.edit_pred_0,
-                    agent_0_as_global_ref=self.hparams.agent_0_as_global_ref,
-                )
+
+            (
+                pred_dict_0["pred_valid"],
+                pred_dict_0["pred_conf"],
+                pred_dict_0["pred"],
+                pred_dict["pred_valid"],
+                pred_dict["pred_conf"],
+                pred_dict["pred"],
+                pred_dict["to_predict"],
+                last_hidden_state_0,
+                last_hidden_state_1,
+            ) = self.model(
+                **input_dict,
+                ref_role=pred_dict["ref_role"],
+                pairwise_joint=self.hparams.pairwise_joint,
+                additive_decoding=self.hparams.additive_decoding,
+                pred_1_global=self.hparams.pred_1_global,
+                pred_1_skip_context=self.hparams.pred_1_skip_context,
+                edit_pred_0=self.hparams.edit_pred_0,
+                agent_0_as_global_ref=self.hparams.agent_0_as_global_ref,
             )
             pred_dict_0 = self.post_processing_0(pred_dict_0)
             # metrics_dict_0 = self.train_metric_0(**pred_dict_0, **gt_dict)
-            
+
             # pairwise joint only for targets with to predict flag
             if self.hparams.pairwise_joint:
                 n_dec, n_scene, n_target, n_pred = pred_dict["pred_conf"].shape
-                
+
                 # to_predict = pred_dict["ref_role"][..., 2]
                 to_predict = pred_dict["to_predict"]
-                
-                conf_0 = pred_dict_0['pred_conf'][to_predict[None, ...]] # For extra n_dec dimenion
-                
-                pred_0 = pred_dict_0['pred'][to_predict[None, ...]][..., :2] # Only pos in xy
-                pred_0 = rearrange(pred_0, "b n_pred timesteps xy -> (b n_pred) (timesteps xy)") # b = (n_dec n_scene n_to_predict)
+
+                conf_0 = pred_dict_0["pred_conf"][
+                    to_predict[None, ...]
+                ]  # For extra n_dec dimenion
+
+                pred_0 = pred_dict_0["pred"][to_predict[None, ...]][
+                    ..., :2
+                ]  # Only pos in xy
+                pred_0 = rearrange(
+                    pred_0, "b n_pred timesteps xy -> (b n_pred) (timesteps xy)"
+                )  # b = (n_dec n_scene n_to_predict)
             else:
                 # print(f"{pred_dict_0['pred_conf'].shape = }") # torch.Size([1, 6, 8, 6])
-                conf_0 = rearrange(pred_dict_0['pred_conf'], "n_dec n_scene n_target n_pred -> (n_dec n_scene n_target) n_pred")                
-                pred_0 = rearrange(pred_dict_0["pred"][..., :2], "n_dec n_scene n_target n_pred timesteps xy -> (n_dec n_scene n_target n_pred) (timesteps xy)")
-            
-            conf_1 = rearrange(pred_dict['pred_conf'], "n_dec n_scene n_target n_pred -> (n_dec n_scene n_target) n_pred")
-            pred_1 = rearrange(pred_dict["pred"][..., :2], "n_dec n_scene n_target n_pred timesteps xy -> (n_dec n_scene n_target n_pred) (timesteps xy)")
-            
+                conf_0 = rearrange(
+                    pred_dict_0["pred_conf"],
+                    "n_dec n_scene n_target n_pred -> (n_dec n_scene n_target) n_pred",
+                )
+                pred_0 = rearrange(
+                    pred_dict_0["pred"][..., :2],
+                    "n_dec n_scene n_target n_pred timesteps xy -> (n_dec n_scene n_target n_pred) (timesteps xy)",
+                )
+
+            conf_1 = rearrange(
+                pred_dict["pred_conf"],
+                "n_dec n_scene n_target n_pred -> (n_dec n_scene n_target) n_pred",
+            )
+            pred_1 = rearrange(
+                pred_dict["pred"][..., :2],
+                "n_dec n_scene n_target n_pred timesteps xy -> (n_dec n_scene n_target n_pred) (timesteps xy)",
+            )
+
             # trajs abs dist or mse and kullback leibler for confs
             conf_kl = kl_divergence(conf_0.softmax(dim=-1), conf_1.softmax(dim=-1))
-            
+
             self.log(
                 f"val/conf_0vs1_kl_divergence",
                 conf_kl,
                 sync_dist=True,
             )
-            
+
             pred_mse = mean_squared_error(pred_0, pred_1)
-            
+
             self.log(
                 f"val/pred_0vs1_mse",
                 pred_mse,
                 sync_dist=True,
             )
-            
+
             if self.hparams.measure_neural_regression_collapse:
                 self.hidden_states_0.append(last_hidden_state_0)
                 self.hidden_states_1.append(last_hidden_state_1)
-            
+
             if self.hparams.save_path_hidden_states_dbl_decoding:
-                torch.save(pred_dict_0, f"{self.hparams.save_path_hidden_states_dbl_decoding}/pred_dict_0_batch_{batch_idx:04}.pt")
+                torch.save(
+                    pred_dict_0,
+                    f"{self.hparams.save_path_hidden_states_dbl_decoding}/pred_dict_0_batch_{batch_idx:04}.pt",
+                )
         else:
             pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"] = (
                 self.model(
@@ -581,37 +635,89 @@ class FutureMotion(LightningModule):
         if self.hparams.pairwise_joint:
             n_dec, n_scene, n_target, n_pred = pred_dict["pred_conf"].shape
             to_predict = pred_dict["to_predict"]
-            
+
             pred_dict["ref_pos"] = pred_dict["ref_pos"][to_predict]
             pred_dict["ref_rot"] = pred_dict["ref_rot"][to_predict]
             pred_dict["ref_type"] = pred_dict["ref_type"][to_predict]
             pred_dict["ref_idx"] = pred_dict["ref_idx"][to_predict]
-            
-            pred_dict["ref_pos"] = rearrange(pred_dict["ref_pos"], "(n_scene n_target) ... -> n_scene n_target ...", n_scene=n_scene)
-            pred_dict["ref_rot"] = rearrange(pred_dict["ref_rot"], "(n_scene n_target) ... -> n_scene n_target ...", n_scene=n_scene)
-            pred_dict["ref_type"] = rearrange(pred_dict["ref_type"], "(n_scene n_target) ... -> n_scene n_target ...", n_scene=n_scene)
-            pred_dict["ref_idx"] = rearrange(pred_dict["ref_idx"], "(n_scene n_target) ... -> n_scene n_target ...", n_scene=n_scene)
-            
+
+            pred_dict["ref_pos"] = rearrange(
+                pred_dict["ref_pos"],
+                "(n_scene n_target) ... -> n_scene n_target ...",
+                n_scene=n_scene,
+            )
+            pred_dict["ref_rot"] = rearrange(
+                pred_dict["ref_rot"],
+                "(n_scene n_target) ... -> n_scene n_target ...",
+                n_scene=n_scene,
+            )
+            pred_dict["ref_type"] = rearrange(
+                pred_dict["ref_type"],
+                "(n_scene n_target) ... -> n_scene n_target ...",
+                n_scene=n_scene,
+            )
+            pred_dict["ref_idx"] = rearrange(
+                pred_dict["ref_idx"],
+                "(n_scene n_target) ... -> n_scene n_target ...",
+                n_scene=n_scene,
+            )
+
         if self.hparams.eval_pairwise_joint:
             n_dec, n_scene, n_target, n_pred = pred_dict["pred_conf"].shape
             pred_dict["ref_pos"] = pred_dict["ref_pos"][pred_dict["ref_role"][..., 2]]
             pred_dict["ref_rot"] = pred_dict["ref_rot"][pred_dict["ref_role"][..., 2]]
             pred_dict["ref_type"] = pred_dict["ref_type"][pred_dict["ref_role"][..., 2]]
             pred_dict["ref_idx"] = pred_dict["ref_idx"][pred_dict["ref_role"][..., 2]]
-            pred_dict["ref_pos"] = rearrange(pred_dict["ref_pos"], "(n_scene n_target) ... -> n_scene n_target ...", n_scene=n_scene)
-            pred_dict["ref_rot"] = rearrange(pred_dict["ref_rot"], "(n_scene n_target) ... -> n_scene n_target ...", n_scene=n_scene)
-            pred_dict["ref_type"] = rearrange(pred_dict["ref_type"], "(n_scene n_target) ... -> n_scene n_target ...", n_scene=n_scene)
-            pred_dict["ref_idx"] = rearrange(pred_dict["ref_idx"], "(n_scene n_target) ... -> n_scene n_target ...", n_scene=n_scene)
-            
+            pred_dict["ref_pos"] = rearrange(
+                pred_dict["ref_pos"],
+                "(n_scene n_target) ... -> n_scene n_target ...",
+                n_scene=n_scene,
+            )
+            pred_dict["ref_rot"] = rearrange(
+                pred_dict["ref_rot"],
+                "(n_scene n_target) ... -> n_scene n_target ...",
+                n_scene=n_scene,
+            )
+            pred_dict["ref_type"] = rearrange(
+                pred_dict["ref_type"],
+                "(n_scene n_target) ... -> n_scene n_target ...",
+                n_scene=n_scene,
+            )
+            pred_dict["ref_idx"] = rearrange(
+                pred_dict["ref_idx"],
+                "(n_scene n_target) ... -> n_scene n_target ...",
+                n_scene=n_scene,
+            )
+
             # prob also set valid and filter preds
-            pred_dict["pred_valid"] = pred_dict["pred_valid"][pred_dict["ref_role"][..., 2]]
-            pred_dict["pred_valid"] = rearrange(pred_dict["pred_valid"], "(n_scene n_role_to_predict) -> n_scene n_role_to_predict", n_scene=n_scene)
-            
-            pred_dict['pred_conf'] = pred_dict['pred_conf'][pred_dict["ref_role"][..., 2][None, ...]] # For extra n_dec dimenion
-            pred_dict['pred_conf'] = rearrange(pred_dict["pred_conf"], "(n_dec n_scene n_to_predict) ... -> n_dec n_scene n_to_predict ...", n_dec=n_dec, n_scene=n_scene)
-            
-            pred_dict['pred'] = pred_dict['pred'][pred_dict["ref_role"][..., 2][None, ...]]
-            pred_dict['pred'] = rearrange(pred_dict['pred'], "(n_dec n_scene n_to_predict) n_pred timesteps pred_dim -> n_dec n_scene n_to_predict n_pred timesteps pred_dim", n_dec=n_dec, n_scene=n_scene) # b = (n_dec n_scene n_to_predict)
+            pred_dict["pred_valid"] = pred_dict["pred_valid"][
+                pred_dict["ref_role"][..., 2]
+            ]
+            pred_dict["pred_valid"] = rearrange(
+                pred_dict["pred_valid"],
+                "(n_scene n_role_to_predict) -> n_scene n_role_to_predict",
+                n_scene=n_scene,
+            )
+
+            pred_dict["pred_conf"] = pred_dict["pred_conf"][
+                pred_dict["ref_role"][..., 2][None, ...]
+            ]  # For extra n_dec dimenion
+            pred_dict["pred_conf"] = rearrange(
+                pred_dict["pred_conf"],
+                "(n_dec n_scene n_to_predict) ... -> n_dec n_scene n_to_predict ...",
+                n_dec=n_dec,
+                n_scene=n_scene,
+            )
+
+            pred_dict["pred"] = pred_dict["pred"][
+                pred_dict["ref_role"][..., 2][None, ...]
+            ]
+            pred_dict["pred"] = rearrange(
+                pred_dict["pred"],
+                "(n_dec n_scene n_to_predict) n_pred timesteps pred_dim -> n_dec n_scene n_to_predict n_pred timesteps pred_dim",
+                n_dec=n_dec,
+                n_scene=n_scene,
+            )  # b = (n_dec n_scene n_to_predict)
 
         # ! post-processing
         # for _ in range(self.hparams.inference_repeat_n):
@@ -672,7 +778,7 @@ class FutureMotion(LightningModule):
             self._save_to_submission_files(pred_dict_0, batch)
         else:
             self._save_to_submission_files(pred_dict, batch)
-        
+
         if self.hparams.dbl_decoding:
             waymo_ops_inputs_0 = self.waymo_metric_0(
                 batch, pred_dict_0["waymo_trajs"], pred_dict_0["waymo_scores"]
@@ -683,13 +789,13 @@ class FutureMotion(LightningModule):
     def validation_epoch_end(self, outputs):
         if self.hparams.pre_training:
             return None
-        
+
         epoch_waymo_metrics = self.waymo_metric.compute_waymo_motion_metrics()
         epoch_waymo_metrics["epoch"] = self.current_epoch
-        
+
         for k, v in epoch_waymo_metrics.items():
             self.log(k, v, on_epoch=True)
-        
+
         self.log(
             "val/loss",
             -epoch_waymo_metrics[f"{self.waymo_metric.prefix}/mean_average_precision"],
@@ -698,32 +804,48 @@ class FutureMotion(LightningModule):
         if self.global_rank == 0:
             self.sub_womd.save_sub_files(self.logger[0])
             self.sub_av2.save_sub_files(self.logger[0])
-        
+
         if self.hparams.dbl_decoding:
             epoch_waymo_metrics_0 = self.waymo_metric_0.compute_waymo_motion_metrics()
             epoch_waymo_metrics_0["epoch"] = self.current_epoch
-            
+
             for k, v in epoch_waymo_metrics_0.items():
                 self.log(k, v, on_epoch=True)
-            
+
             if self.hparams.measure_neural_regression_collapse:
                 n_batches = len(self.hidden_states_0)
-                
-                hidden_states_1_pairwise = rearrange(torch.cat(self.hidden_states_1, dim=0), "(n_batches n_scenes n_targets n_pred) hidden_dim -> (n_batches n_scenes n_pred) (n_targets hidden_dim)", 
-                    n_batches=n_batches, n_targets=2, n_pred=6,
+
+                hidden_states_1_pairwise = rearrange(
+                    torch.cat(self.hidden_states_1, dim=0),
+                    "(n_batches n_scenes n_targets n_pred) hidden_dim -> (n_batches n_scenes n_pred) (n_targets hidden_dim)",
+                    n_batches=n_batches,
+                    n_targets=2,
+                    n_pred=6,
                 )
-                
+
                 hidden_states_0 = torch.cat(self.hidden_states_0, dim=0)
                 hidden_states_1 = torch.cat(self.hidden_states_1, dim=0)
-                
-                nrc1_hidden_states_0_32 = nrc1_feature_collapse(hidden_states_0, dim_output=32) # 2x 16 DCT coeffs
-                nrc1_hidden_states_0_272 = nrc1_feature_collapse(hidden_states_0, dim_output=272) # 2x 16 DCT coeffs + 3x 80 density params
-                nrc1_hidden_states_1_32 = nrc1_feature_collapse(hidden_states_1, dim_output=32)
-                nrc1_hidden_states_1_272 = nrc1_feature_collapse(hidden_states_1, dim_output=272)
-                
-                nrc1_hidden_states_1_pairwise_64 = nrc1_feature_collapse(hidden_states_1_pairwise, dim_output=64) # 2x 2x 16 DCT coeffs
-                nrc1_hidden_states_1_pairwise_544 = nrc1_feature_collapse(hidden_states_1_pairwise, dim_output=544)
-                
+
+                nrc1_hidden_states_0_32 = nrc1_feature_collapse(
+                    hidden_states_0, dim_output=32
+                )  # 2x 16 DCT coeffs
+                nrc1_hidden_states_0_272 = nrc1_feature_collapse(
+                    hidden_states_0, dim_output=272
+                )  # 2x 16 DCT coeffs + 3x 80 density params
+                nrc1_hidden_states_1_32 = nrc1_feature_collapse(
+                    hidden_states_1, dim_output=32
+                )
+                nrc1_hidden_states_1_272 = nrc1_feature_collapse(
+                    hidden_states_1, dim_output=272
+                )
+
+                nrc1_hidden_states_1_pairwise_64 = nrc1_feature_collapse(
+                    hidden_states_1_pairwise, dim_output=64
+                )  # 2x 2x 16 DCT coeffs
+                nrc1_hidden_states_1_pairwise_544 = nrc1_feature_collapse(
+                    hidden_states_1_pairwise, dim_output=544
+                )
+
                 self.log(
                     "val/nrc1_hidden_states_0_32",
                     nrc1_hidden_states_0_32,
@@ -754,76 +876,104 @@ class FutureMotion(LightningModule):
                     nrc1_hidden_states_1_pairwise_544,
                     sync_dist=True,
                 )
-                
+
                 if self.global_rank == 0:
                     sv0 = scipy.linalg.svdvals(hidden_states_0.cpu())
-                    sv0_mean = scipy.linalg.svdvals(hidden_states_0.cpu() - hidden_states_0.cpu().mean(axis=0))
+                    sv0_mean = scipy.linalg.svdvals(
+                        hidden_states_0.cpu() - hidden_states_0.cpu().mean(axis=0)
+                    )
                     sv1 = scipy.linalg.svdvals(hidden_states_1.cpu())
-                    sv1_mean = scipy.linalg.svdvals(hidden_states_1.cpu() - hidden_states_1.cpu().mean(axis=0))
-                    
-                    plt.plot(sv0, label='hidden0')
-                    plt.plot(sv1, label='hidden1')
+                    sv1_mean = scipy.linalg.svdvals(
+                        hidden_states_1.cpu() - hidden_states_1.cpu().mean(axis=0)
+                    )
+
+                    plt.plot(sv0, label="hidden0")
+                    plt.plot(sv1, label="hidden1")
                     plt.legend()
-                    plt.title('Singular values')
-                    
+                    plt.title("Singular values")
+
                     wandb.log({"Singular values": plt})
-                    
-                    plt.plot(sv0_mean, label='hidden0')
-                    plt.plot(sv1_mean, label='hidden1')
+
+                    plt.plot(sv0_mean, label="hidden0")
+                    plt.plot(sv1_mean, label="hidden1")
                     plt.legend()
-                    plt.title('Singular values mean')
-                    
+                    plt.title("Singular values mean")
+
                     wandb.log({"Singular values mean": plt})
-                
+
                 # Empty buffers
                 self.hidden_states_0 = []
                 self.hidden_states_1 = []
 
     def test_step(self, batch: Dict[str, Tensor], batch_idx: int) -> Dict:
-         # ! map can be empty for some scenes, check batch["map/valid"]
+        # ! map can be empty for some scenes, check batch["map/valid"]
         batch = self.pre_processing(batch)
         input_dict = {
             k.split("input/")[-1]: v for k, v in batch.items() if "input/" in k
         }
         pred_dict = {k.replace("/", "_"): v for k, v in batch.items() if "ref/" in k}
-        
+
         if self.hparams.dbl_decoding:
             pred_dict_0 = copy.deepcopy(pred_dict)
-            
-            pred_dict_0["pred_valid"], pred_dict_0["pred_conf"], pred_dict_0["pred"], pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"], pred_dict["to_predict"], last_hidden_state_0, last_hidden_state_1 = (
-                self.model(
-                    **input_dict,
-                    ref_role=pred_dict["ref_role"],
-                    pairwise_joint=self.hparams.pairwise_joint,
-                    additive_decoding=self.hparams.additive_decoding,
-                    pred_1_global=self.hparams.pred_1_global,
-                    pred_1_skip_context=self.hparams.pred_1_skip_context,
-                    agent_0_as_global_ref=self.hparams.agent_0_as_global_ref,
-                )
+
+            (
+                pred_dict_0["pred_valid"],
+                pred_dict_0["pred_conf"],
+                pred_dict_0["pred"],
+                pred_dict["pred_valid"],
+                pred_dict["pred_conf"],
+                pred_dict["pred"],
+                pred_dict["to_predict"],
+                last_hidden_state_0,
+                last_hidden_state_1,
+            ) = self.model(
+                **input_dict,
+                ref_role=pred_dict["ref_role"],
+                pairwise_joint=self.hparams.pairwise_joint,
+                additive_decoding=self.hparams.additive_decoding,
+                pred_1_global=self.hparams.pred_1_global,
+                pred_1_skip_context=self.hparams.pred_1_skip_context,
+                agent_0_as_global_ref=self.hparams.agent_0_as_global_ref,
             )
-            
+
             # For pred_dict_0 as well? -> no since still 8 preds not only for to_predict targets
             if self.hparams.pairwise_joint:
                 n_dec, n_scene, n_target, n_pred = pred_dict["pred_conf"].shape
                 to_predict = pred_dict["to_predict"]
-                
+
                 pred_dict["ref_pos"] = pred_dict["ref_pos"][to_predict]
                 pred_dict["ref_rot"] = pred_dict["ref_rot"][to_predict]
                 pred_dict["ref_type"] = pred_dict["ref_type"][to_predict]
                 pred_dict["ref_idx"] = pred_dict["ref_idx"][to_predict]
-                pred_dict["ref_pos"] = rearrange(pred_dict["ref_pos"], "(n_scene n_target) ... -> n_scene n_target ...", n_scene=n_scene)
-                pred_dict["ref_rot"] = rearrange(pred_dict["ref_rot"], "(n_scene n_target) ... -> n_scene n_target ...", n_scene=n_scene)
-                pred_dict["ref_type"] = rearrange(pred_dict["ref_type"], "(n_scene n_target) ... -> n_scene n_target ...", n_scene=n_scene)
-                pred_dict["ref_idx"] = rearrange(pred_dict["ref_idx"], "(n_scene n_target) ... -> n_scene n_target ...", n_scene=n_scene)
-                
+                pred_dict["ref_pos"] = rearrange(
+                    pred_dict["ref_pos"],
+                    "(n_scene n_target) ... -> n_scene n_target ...",
+                    n_scene=n_scene,
+                )
+                pred_dict["ref_rot"] = rearrange(
+                    pred_dict["ref_rot"],
+                    "(n_scene n_target) ... -> n_scene n_target ...",
+                    n_scene=n_scene,
+                )
+                pred_dict["ref_type"] = rearrange(
+                    pred_dict["ref_type"],
+                    "(n_scene n_target) ... -> n_scene n_target ...",
+                    n_scene=n_scene,
+                )
+                pred_dict["ref_idx"] = rearrange(
+                    pred_dict["ref_idx"],
+                    "(n_scene n_target) ... -> n_scene n_target ...",
+                    n_scene=n_scene,
+                )
+
             pred_dict_0 = self.post_processing_0(pred_dict_0)
         else:
-            pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"] = self.model(
-                **input_dict
+            pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"] = (
+                self.model(**input_dict)
             )
-        
+
         pred_dict = self.post_processing(pred_dict)
-        
+
         if self.hparams.save_pred_0:
             self._save_to_submission_files(pred_dict_0, batch)
         else:
