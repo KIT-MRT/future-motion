@@ -1,0 +1,10 @@
+_target_: hptr_modules.data_modules.data_h5_nuplan.DataH5nuplan
+
+data_dir: ""
+filename_train: training
+filename_val: validation
+filename_test: testing
+n_agent: 64
+
+batch_size: 3
+num_workers: 4
