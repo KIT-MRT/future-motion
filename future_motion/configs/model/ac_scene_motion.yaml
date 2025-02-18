@@ -12,6 +12,11 @@ model:
   _target_: future_motion.models.ac_scene_motion.SceneMotion
   hidden_dim: 256
   n_decoders: 1
+  use_ego_nav: ${use_ego_nav}
+  nav_with_route: ${nav_with_route}
+  nav_with_goal: ${nav_with_goal}
+  nav_route_late_fusion: ${nav_route_late_fusion}
+  nav_goal_late_fusion: ${nav_goal_late_fusion}
   tf_cfg:
     n_head: 4
     dropout_p: 0.1
@@ -21,13 +26,20 @@ model:
     add_learned_pe: True
     use_point_net: False
     n_layer_mlp: 3
-    mlp_cfg:
+    mlp_cfg: &mlp_config
       end_layer_activation: True
       use_layernorm: False
       use_batchnorm: False
       dropout_p: null
+  local_route_encoder:
+    add_learned_pe: True
+    n_layer_mlp: 3
+    mlp_cfg: *mlp_config
   reduction_decoder:
     n_descriptors: 128
+    n_layer_tf_all2all: 4
+  route_reduction_decoder:
+    n_descriptors: 20
     n_layer_tf_all2all: 4
   latent_context_module:
     n_layer: 6
@@ -52,7 +64,7 @@ model:
 
 
 train_metric:
-  _target_: hptr_modules.models.metrics.nll.NllMetrics
+  _target_: future_motion.models.metrics.planning.EgoPlanningMetrics
   winner_takes_all: joint_hard1 # none, or (joint) + hard + (1-6), or cmd
   l_pos: nll_torch # nll_torch, nll_mtr, huber, l2
   p_rand_train_agent: -1 # 0.2
@@ -63,29 +75,40 @@ train_metric:
   w_yaw: [1.0, 1.0, 1.0]
   w_vel: [1.0, 1.0, 1.0]
   w_spd: [0, 0, 0]
+  nav_with_route: ${nav_with_route}
+  nav_with_goal: ${nav_with_goal}
 
 waymo_metric:
   _target_: hptr_modules.models.metrics.waymo.WaymoMetrics
   n_max_pred_agent: 8
 
+waymo_ego_metric:
+  _target_: future_motion.models.metrics.waymo_ego.WaymoEgoMetrics
+  n_max_pred_agent: 1
+
 pre_processing:
   agent_centric:
-    _target_: hptr_modules.data_modules.agent_centric.AgentCentricPreProcessing
+    _target_: future_motion.data.agent_centric_ego_nav.AgentCentricPreProcessingWithEgoNav
     mask_invalid: False
     n_target: 8
     n_other: 48
     n_map: 128 # 512
     n_tl: 24
+    n_route: 50
   ac_global:
     _target_: future_motion.data.ac_scene_motion.AgentCentricSceneMotion
     dropout_p_history: 0.15
     use_current_tl: False
     add_ohe: True
     pl_aggr: False
+    pl_aggr_route: False
     pose_pe: # xy_dir, mpa_pl, pe_xy_dir, pe_xy_yaw
       agent: xy_dir
       map: mpa_pl
       tl: mpa_pl
+      route: mpa_pl
+    use_ego_nav: ${use_ego_nav}
+    nav_with_route: ${nav_with_route}
 
 post_processing:
   to_dict:

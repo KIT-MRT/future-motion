@@ -16,3 +16,10 @@ hydra:
 work_dir: ${hydra:runtime.cwd}
 seed: 2023
 action: fit # fit, validate, test
+
+# Shared parameter for motion planning
+use_ego_nav: False
+nav_with_route: False
+nav_with_goal: False
+nav_route_late_fusion: False
+nav_goal_late_fusion: False
