@@ -827,23 +827,23 @@ class FutureMotion(LightningModule):
                 hidden_states_1 = torch.cat(self.hidden_states_1, dim=0)
 
                 nrc1_hidden_states_0_32 = nrc1_feature_collapse(
-                    hidden_states_0, dim_output=32
+                    hidden_states_0, d_output=32
                 )  # 2x 16 DCT coeffs
                 nrc1_hidden_states_0_272 = nrc1_feature_collapse(
-                    hidden_states_0, dim_output=272
+                    hidden_states_0, d_output=272
                 )  # 2x 16 DCT coeffs + 3x 80 density params
                 nrc1_hidden_states_1_32 = nrc1_feature_collapse(
-                    hidden_states_1, dim_output=32
+                    hidden_states_1, d_output=32
                 )
                 nrc1_hidden_states_1_272 = nrc1_feature_collapse(
-                    hidden_states_1, dim_output=272
+                    hidden_states_1, d_output=272
                 )
 
                 nrc1_hidden_states_1_pairwise_64 = nrc1_feature_collapse(
-                    hidden_states_1_pairwise, dim_output=64
+                    hidden_states_1_pairwise, d_output=64
                 )  # 2x 2x 16 DCT coeffs
                 nrc1_hidden_states_1_pairwise_544 = nrc1_feature_collapse(
-                    hidden_states_1_pairwise, dim_output=544
+                    hidden_states_1_pairwise, d_output=544
                 )
 
                 self.log(
