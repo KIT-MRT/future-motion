@@ -454,6 +454,8 @@ class DualDecoder(nn.Module):
             )
         )
 
+        n_timesteps = mlp_head["n_step_future"] # 80/ 60, reused and changed below
+        
         if n_dct_coeffs:
             self.linear_dct = LinearDCT(
                 in_features=mlp_head["n_step_future"], type="dct", norm="ortho"
@@ -501,9 +503,7 @@ class DualDecoder(nn.Module):
         )
 
         # reembed (the regression output)
-        # not for the initial anchor, but a later hidden state -> re... opt. call Retrotokenizer (retrocausation)
         _d = 2 * hidden_dim  # opt. also optimize as hyperparam
-        n_timesteps = 80
         pred_dim = 5  # assuming "cov3" TODO: read from config
 
         if mlp_reencoder_without_dct:
