@@ -730,6 +730,7 @@ class FutureMotion(LightningModule):
                 pred_dict=tensor_dict_to_cpu(pred_dict),
                 idx_t_now=self.hparams.time_step_current,
                 n_step_future=self.hparams.time_step_end - self.hparams.time_step_current,
+                idx_batch=0,
             )
             np_img = mplfig_to_npimage(fig)
             wandb_imgs.append(wandb.Image(np_img, caption=f"forecasts"))
