@@ -1,5 +1,6 @@
 import nc_toolbox as nctb
 from torch import Tensor
+from numpy.typing import NDArray
 
 
 def nrc1_feature_collapse(hidden_states_0: Tensor, d_output: int) -> float:
@@ -21,3 +22,8 @@ def nrc3_specific_structure(weight_matrix: Tensor, output_tensor: Tensor) -> flo
     _, d_output = Y.shape
     assert W.shape[0] == d_output
     return nctb.nrc3_structure(W, Y, d_output)
+
+
+def nrc1_feature_collapse_all(hidden_states_0: Tensor) -> NDArray:
+    H = hidden_states_0.cpu().numpy()  # n_sample x d_feature
+    return nctb.nrc1_collapse_all(H)

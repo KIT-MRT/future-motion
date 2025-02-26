@@ -19,7 +19,7 @@ from torchmetrics.functional.regression import pearson_corrcoef, mean_squared_er
 
 from future_motion.models.modules.neural_collapse import OnlineLinearClassifier
 from future_motion.models.metrics.representation_eval import std_of_l2_normalized
-from future_motion.models.metrics.regression_collapse import nrc1_feature_collapse
+from future_motion.models.metrics.regression_collapse import nrc1_feature_collapse, nrc1_feature_collapse_all
 from future_motion.data.lang_labels import (
     agent_dict,
     direction_dict,
@@ -900,6 +900,20 @@ class FutureMotion(LightningModule):
                     plt.title("Singular values mean")
 
                     wandb.log({"Singular values mean": plt})
+                    
+                    nrc1_all_0 = nrc1_feature_collapse_all(hidden_states_0)
+                    nrc1_all_1 = nrc1_feature_collapse_all(hidden_states_1)
+                    
+                    x_ticks = np.arange(hidden_states_0.shape[-1])
+                    plt.bar(x_ticks, nrc1_all_0)
+                    plt.title("NRC1 hidden states 0")
+                    
+                    wandb.log({"NRC1 hidden states 0": plt})
+                    
+                    plt.bar(x_ticks, nrc1_all_1)
+                    plt.title("NRC1 hidden states 1")
+                    
+                    wandb.log({"NRC1 hidden states 1": plt})
 
                 # Empty buffers
                 self.hidden_states_0 = []
