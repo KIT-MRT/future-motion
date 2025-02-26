@@ -645,7 +645,7 @@ class DualDecoder(nn.Module):
         # Edit trajs here
         if edit_pred_0:
             # pred_0_pos[..., 79, :] += 20
-            pred_0_pos[..., 70:80, :] += 20
+            pred_0_pos[..., -10:, :] += 20
             # print(f"{pred_0_pos.shape = }") # [16, 8, 6, 80, 2]
 
             # edit last point
