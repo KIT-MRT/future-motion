@@ -81,6 +81,11 @@ def plot_motion_forecasts(
                     if mode_setting == "all"
                     else int(idx_mode_plot[idx_batch, idx_agent])
                 )
+
+                # Skip static trajs (most of them are placeholders)
+                if agent[idx_mode, 0, 0] - agent[idx_mode, -1, 0] == 0.0:
+                    continue
+                
                 plt.scatter(
                     agent[idx_mode, :, 0],
                     agent[idx_mode, :, 1],
@@ -101,6 +106,9 @@ def plot_motion_forecasts(
             batch["agent/spd"][idx_batch, idx_t_now],
         )
     ):
+        if not batch["agent/valid"][idx_batch, idx_t_now, idx]:
+            continue
+        
         if agent_type[0]:
             bbox = rotate_bbox_zaxis(car, float(agent_yaw))
             bbox = shift_cuboid(float(agent_pos[0]), float(agent_pos[1]), bbox)
