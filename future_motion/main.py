@@ -726,7 +726,10 @@ class FutureMotion(LightningModule):
         if self.hparams.plot_motion and batch_idx < 3:
             wandb_imgs = []
             fig = plot_motion_forecasts(
-                tensor_dict_to_cpu(batch), pred_dict=tensor_dict_to_cpu(pred_dict)
+                tensor_dict_to_cpu(batch),
+                pred_dict=tensor_dict_to_cpu(pred_dict),
+                idx_t_now=self.hparams.time_step_current,
+                n_step_future=self.hparams.time_step_end - self.hparams.time_step_current,
             )
             np_img = mplfig_to_npimage(fig)
             wandb_imgs.append(wandb.Image(np_img, caption=f"forecasts"))
