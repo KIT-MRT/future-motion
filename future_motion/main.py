@@ -73,6 +73,7 @@ class FutureMotion(LightningModule):
         edit_pred_0: bool = False,
         agent_0_as_global_ref: bool = False,
         measure_neural_regression_collapse: bool = False,
+        plot_pred_0: bool = False,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
@@ -86,6 +87,7 @@ class FutureMotion(LightningModule):
         print(f"{edit_pred_0 = }")
         print(f"{agent_0_as_global_ref = }")
         print(f"{measure_neural_regression_collapse = }")
+        print(f"{plot_pred_0 = }")
 
         # pre_processing
         self.pre_processing = []
@@ -725,9 +727,15 @@ class FutureMotion(LightningModule):
 
         if self.hparams.plot_motion and batch_idx < 3:
             wandb_imgs = []
+            
+            if self.hparams.plot_pred_0:
+                pred_dict_plot = tensor_dict_to_cpu(pred_dict_0)
+            else:
+                pred_dict_plot = tensor_dict_to_cpu(pred_dict)
+            
             fig = plot_motion_forecasts(
                 tensor_dict_to_cpu(batch),
-                pred_dict=tensor_dict_to_cpu(pred_dict),
+                pred_dict=pred_dict_plot,
                 idx_t_now=self.hparams.time_step_current,
                 n_step_future=self.hparams.time_step_end - self.hparams.time_step_current,
                 idx_batch=0,
