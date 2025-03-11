@@ -642,11 +642,31 @@ class DualDecoder(nn.Module):
 
         pred_0_pos = pred_0[..., :2]
 
+        # TODO: add goal-based instructions and make direction a hparam (left or right)
         # Edit trajs here
         if edit_pred_0:
             # pred_0_pos[..., 79, :] += 20
-            pred_0_pos[..., -10:, :] += 20
-            # print(f"{pred_0_pos.shape = }") # [16, 8, 6, 80, 2]
+            # pred_0_pos[..., -10:, 1] += 20
+            current_speed = compute_speed_from_trajectory(pred_0_pos)
+            
+            n_batch, n_scene, n_agent = pred_0_pos.shape[:-2]
+            
+            current_speed = rearrange(current_speed, "n_batch n_scene n_agent -> (n_batch n_scene n_agent)")
+            
+            quarter_circle_traj = generate_quarter_circle_trajectory_torch(
+                speed=current_speed,
+                direction="right",
+                num_points=pred_0_pos.shape[-2],
+                device=pred_0_pos.device,
+            )
+            
+            quarter_circle_traj = rearrange(
+                quarter_circle_traj, "(n_batch n_scene n_agent) n_step_future pred_dim -> n_batch n_scene n_agent n_step_future pred_dim",
+                n_batch=n_batch, n_scene=n_scene, n_agent=n_agent,
+            )
+            
+            pred_0_pos[..., -40:, :] = quarter_circle_traj[..., :40, :] + pred_0_pos[..., -40, :].unsqueeze(-2) 
+            
 
             # edit last point
 
@@ -989,6 +1009,7 @@ class DualDecoder(nn.Module):
         )
 
 
+# TODO: move fns to utils
 def torch_pos2global(in_pos: Tensor, local_pos: Tensor, local_rot: Tensor) -> Tensor:
     """Reverse torch_pos2local
 
@@ -1027,3 +1048,116 @@ def get_pos_encoding(seq_len, dim, scaling_factor=10000):
             enc[k, 2 * i + 1] = torch.cos(k / denominator)
 
     return enc
+
+
+def compute_speed_from_trajectory(trajectory, time_step=0.1):
+    """
+    Compute the speed of a trajectory using the first two points.
+    
+    Parameters:
+    -----------
+    trajectory : torch.Tensor
+        Tensor of shape [..., num_time_steps, 2] representing trajectory coordinates
+        where the last dimension contains (x, y) coordinates
+    time_step : float, optional
+        Time interval between consecutive points (default: 0.1)
+    
+    Returns:
+    --------
+    torch.Tensor
+        Tensor of shape [...] containing the computed speeds
+    """
+    point_0 = trajectory[..., 0, :]  # Shape: [..., 2]
+    point_1 = trajectory[..., 1, :]  # Shape: [..., 2]
+    
+    displacement = torch.norm(point_1 - point_0, dim=-1)  # Shape: [...]
+    speed = displacement / time_step
+    
+    return speed
+
+
+def generate_quarter_circle_trajectory_torch(
+    speed,
+    direction='left',
+    num_points=100,
+    device='cpu'
+):
+    """
+    Generate smooth quarter-circle trajectories using PyTorch.
+    Supports batch processing with multiple speeds.
+    
+    Parameters:
+    -----------
+    speed : float or torch.Tensor
+        Speed parameter(s) used to calculate trajectory length.
+        If tensor, will generate multiple trajectories in batch.
+    direction : str, optional
+        Direction of turn ('left' or 'right', default: 'left')
+    num_points : int, optional
+        Number of points in each trajectory (default: 100)
+    device : str, optional
+        Device to store tensors on ('cpu' or 'cuda', default: 'cpu')
+    
+    Returns:
+    --------
+    torch.Tensor
+        For single speed: tensor of shape [num_points, 2] with x,y coordinates
+        For batch: tensor of shape [batch_size, num_points, 2] with x,y coordinates
+    """
+    if direction not in ['left', 'right']:
+        raise ValueError("Direction must be 'left' or 'right'")
+    
+    if num_points < 2:
+        raise ValueError("Number of points must be at least 2")
+    
+    if not isinstance(speed, torch.Tensor):
+        speed = torch.tensor([speed], device=device)
+    else:
+        speed = speed.to(device)
+        
+    # If speed is a scalar tensor, convert to single element vector
+    if speed.dim() == 0:
+        speed = speed.unsqueeze(0)
+    
+    # Get batch size
+    batch_size = speed.shape[0]
+    
+    # Calculate trajectory length for each speed
+    # 1/4 circumference = speed * 0.1 * num_points
+    total_length = speed * 0.1 * num_points
+    
+    # Calculate radius to achieve the desired length
+    # 1/4 circumference = (π/2) * radius
+    radius = total_length / (torch.pi/2)  # [batch_size]
+    
+    # Generate angle array for 1/4 circle (0 to π/2)
+    angle = torch.linspace(0, torch.pi/2, num_points, device=device)  # [num_points]
+    
+    # Reshape for broadcasting
+    radius = radius.view(batch_size, 1)  # [batch_size, 1]
+    angle = angle.view(1, num_points)    # [1, num_points]
+    
+    # Generate coordinates based on direction
+    if direction == "right":
+        # Upper right quadrant (x positive, y positive)
+        x_coords = radius * torch.cos(angle)  # [batch_size, num_points]
+        y_coords = radius * torch.sin(angle)  # [batch_size, num_points]
+        # Shift x-coordinates to start at origin
+        x_coords = x_coords - radius
+    elif direction == "left":
+        # Upper left quadrant (x negative, y positive)
+        x_coords = -radius * torch.cos(angle)  # [batch_size, num_points]
+        y_coords = radius * torch.sin(angle)   # [batch_size, num_points]
+        # Shift x-coordinates to start at origin
+        x_coords = x_coords + radius
+    
+    # Stack x and y coordinates into a single tensor
+    # Result shape: [batch_size, num_points, 2]
+    # trajectories = torch.stack([x_coords, y_coords], dim=2)
+    trajectories = torch.stack([y_coords, x_coords], dim=2)
+    
+    # If only one trajectory, squeeze the batch dimension
+    if batch_size == 1 and not isinstance(speed, torch.Tensor):
+        trajectories = trajectories.squeeze(0)
+        
+    return trajectories
