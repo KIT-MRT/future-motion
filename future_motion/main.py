@@ -74,10 +74,13 @@ class FutureMotion(LightningModule):
         agent_0_as_global_ref: bool = False,
         measure_neural_regression_collapse: bool = False,
         plot_pred_0: bool = False,
+        save_path_pred_dict: str = "",
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
 
+        print(f"{time_step_end = }")
+        print(f"{time_step_current = }")
         print(f"{pairwise_joint = }")
         print(f"{eval_pairwise_joint = }")
         print(f"{measure_dct_reconstruction_error = }")
@@ -88,6 +91,7 @@ class FutureMotion(LightningModule):
         print(f"{agent_0_as_global_ref = }")
         print(f"{measure_neural_regression_collapse = }")
         print(f"{plot_pred_0 = }")
+        print(f"{save_path_pred_dict = }")
 
         # pre_processing
         self.pre_processing = []
@@ -724,8 +728,35 @@ class FutureMotion(LightningModule):
         # ! post-processing
         # for _ in range(self.hparams.inference_repeat_n):
         pred_dict = self.post_processing(pred_dict)
+        
+        if self.hparams.save_path_pred_dict:
+            torch.save(
+                batch["scenario_id"],
+                f"{self.hparams.save_path_pred_dict}/scenario_ids_batch_{batch_idx:04}.pt",
+            )
+            
+            torch.save(
+                batch["scenario_center"],
+                f"{self.hparams.save_path_pred_dict}/scenario_centers_batch_{batch_idx:04}.pt",
+            )
+            
+            torch.save(
+                batch["scenario_yaw"],
+                f"{self.hparams.save_path_pred_dict}/scenario_yaws_batch_{batch_idx:04}.pt",
+            )
+            
+            if self.hparams.dbl_decoding:
+                torch.save(
+                    pred_dict_0,
+                    f"{self.hparams.save_path_pred_dict}/pred_dict_0_batch_{batch_idx:04}.pt",
+                )
+            torch.save(
+                pred_dict,
+                f"{self.hparams.save_path_pred_dict}/pred_dict_batch_{batch_idx:04}.pt",
+            )
+            
 
-        if self.hparams.plot_motion and batch_idx < 3:
+        if self.hparams.plot_motion and batch_idx < 24:
             wandb_imgs = []
             
             if self.hparams.plot_pred_0:
