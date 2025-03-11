@@ -794,7 +794,9 @@ class FutureMotion(LightningModule):
                     fig = plot_motion_forecasts(
                         tensor_dict_to_cpu(batch),
                         pred_dict=tensor_dict_to_cpu(pred_dict),
-                        save_path=f"/home/wagner/tmp_data/words_in_motion/debug_plots/forecasts_{batch_idx}_{tau}.png",
+                        idx_t_now=self.hparams.time_step_current,
+                        n_step_future=self.hparams.time_step_end - self.hparams.time_step_current,
+                        # save_path=f"/home/wagner/tmp_data/words_in_motion/debug_plots/forecasts_{batch_idx}_{tau}.png",
                     )
                     np_img = mplfig_to_npimage(fig)
                     wandb_imgs.append(
