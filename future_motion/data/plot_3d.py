@@ -83,7 +83,9 @@ def plot_motion_forecasts(
                 )
 
                 # Skip static trajs (most of them are placeholders)
-                if agent[idx_mode, 0, 0] - agent[idx_mode, -1, 0] == 0.0:
+                dist_x = np.abs(agent[idx_mode, 0, 0] - agent[idx_mode, -11, 0])
+                dist_y = np.abs(agent[idx_mode, 0, 1] - agent[idx_mode, -11, 1])
+                if dist_x + dist_y < 0.1:
                     continue
                 
                 plt.scatter(
