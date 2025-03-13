@@ -75,10 +75,12 @@ class FutureMotion(LightningModule):
         measure_neural_regression_collapse: bool = False,
         plot_pred_0: bool = False,
         save_path_pred_dict: str = "",
+        save_path_target_input_and_embs: str = "",
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
 
+        # Is there a log hparams function?
         print(f"{time_step_end = }")
         print(f"{time_step_current = }")
         print(f"{pairwise_joint = }")
@@ -92,6 +94,7 @@ class FutureMotion(LightningModule):
         print(f"{measure_neural_regression_collapse = }")
         print(f"{plot_pred_0 = }")
         print(f"{save_path_pred_dict = }")
+        print(f"{save_path_target_input_and_embs = }")
 
         # pre_processing
         self.pre_processing = []
@@ -539,6 +542,18 @@ class FutureMotion(LightningModule):
                     std_of_target_emb,
                     sync_dist=True,
                 )
+                
+                if self.hparams.save_path_target_input_and_embs and batch_idx < 200:
+                    target_input = {k: v for k, v in input_dict.items() if k in [
+                        "motion_labels", "acceleration_labels", "speed_labels", "agent_labels", "direction_labels", "agent_mask", "target_attr", "target_valid"
+                    ]}
+                    torch.save(target_input, f=f"{self.hparams.save_path_target_input_and_embs}/target_input_batch_{batch_idx:04}.pt")
+                    
+                    torch.save(
+                        target_embs,
+                        f"{self.hparams.save_path_target_input_and_embs}/target_embs_batch_{batch_idx:04}.pt",
+                    )
+                    
         elif self.hparams.dbl_decoding:
             pred_dict_0 = copy.deepcopy(pred_dict)
 
