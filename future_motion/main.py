@@ -76,6 +76,7 @@ class FutureMotion(LightningModule):
         plot_pred_0: bool = False,
         save_path_pred_dict: str = "",
         save_path_target_input_and_embs: str = "",
+        control_vectors_target_emb: str = "",
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
@@ -108,7 +109,7 @@ class FutureMotion(LightningModule):
         self.pre_processing = nn.Sequential(*self.pre_processing)
         # model
         self.model = hydra.utils.instantiate(
-            model, **pre_proc_kwargs, _recursive_=False
+            model, **pre_proc_kwargs, control_vectors_target_emb=control_vectors_target_emb, _recursive_=False
         )
         # post_processing
         self.post_processing = nn.Sequential(
