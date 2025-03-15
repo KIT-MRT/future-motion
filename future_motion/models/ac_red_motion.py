@@ -388,7 +388,7 @@ class IntraClassEncoder(nn.Module):
             if self.measure_neural_collapse:
                 target_embs.append(target_emb)
 
-        if self.control_vectors_target_emb is not None:
+        if self.control_vectors_target_emb is not None and self.control_temperature:
             target_emb = self.control_emb(target_emb, self.control_vectors_target_emb.to(target_emb.device), temperature=self.control_temperature) # 32 100
 
         env_emb = torch.cat([map_emb, other_emb], dim=1)
