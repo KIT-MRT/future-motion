@@ -17,6 +17,7 @@ from typing import Dict, List, Tuple, Optional
 from torchmetrics.functional import kl_divergence
 from torchmetrics.functional.regression import pearson_corrcoef, mean_squared_error
 
+from future_motion.data.trajectories import compute_trajectory_length
 from future_motion.models.modules.neural_collapse import OnlineLinearClassifier
 from future_motion.models.metrics.representation_eval import std_of_l2_normalized
 from future_motion.models.metrics.regression_collapse import nrc1_feature_collapse, nrc1_feature_collapse_all
@@ -77,6 +78,7 @@ class FutureMotion(LightningModule):
         save_path_pred_dict: str = "",
         save_path_target_input_and_embs: str = "",
         control_vectors_target_emb: str = "",
+        save_path_calibration_vals: str = "",
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
@@ -226,6 +228,9 @@ class FutureMotion(LightningModule):
                         log_prefix=f"motion_{idx_hidden}",
                     )
                 )
+                
+        if control_vectors_target_emb and control_temperatures:
+            self.calibration_vals = {tau: [] for tau in self.hparams.control_temperatures}
 
     def training_step(self, batch: Dict[str, Tensor], batch_idx: int) -> Dict:
         with torch.no_grad():
@@ -824,6 +829,44 @@ class FutureMotion(LightningModule):
             self.logger[0].experiment.log(
                 {f"motion forecasts batch {batch_idx}": wandb_imgs}, commit=False
             )
+            
+        if self.hparams.control_temperatures and self.hparams.control_vectors_target_emb and batch_idx < 100:
+            traj_idx = 0
+            pred_traj = pred_dict["pred_pos"][0, :, :, traj_idx, :, :]
+            pred_dist = compute_trajectory_length(pred_traj)
+            
+            # Compute mean speed
+            n_future_time_steps = self.hparams.time_step_end - self.hparams.time_step_current
+            pred_mean_speed_base = pred_dist / n_future_time_steps
+            
+            for tau in self.hparams.control_temperatures:                
+                self.model.intra_class_encoder.control_temperature = tau
+
+                (
+                    pred_dict["pred_valid"],
+                    pred_dict["pred_conf"],
+                    pred_dict["pred"],
+                    target_embs,
+                ) = self.model(
+                    inference_repeat_n=self.hparams.inference_repeat_n,
+                    inference_cache_map=self.hparams.inference_cache_map,
+                    **input_dict,
+                )
+                pred_dict = self.post_processing(pred_dict)
+                
+                pred_traj = pred_dict["pred_pos"][0, :, :, traj_idx, :, :]
+                pred_dist = compute_trajectory_length(pred_traj)
+                pred_mean_speed = pred_dist / n_future_time_steps
+
+                pred_mean_speed_relative = ((pred_mean_speed - pred_mean_speed_base) / pred_mean_speed_base) * 100
+                pred_mean_speed_relative = pred_mean_speed_relative.mean(dim=1).mean(dim=0) # mean over agents, then over batches
+                
+                if torch.isnan(pred_mean_speed_relative):
+                   continue
+                
+                self.calibration_vals[tau].append(float(pred_mean_speed_relative))
+
+            self.model.intra_class_encoder.control_temperature = 0
 
         if self.hparams.inference_repeat_n > 1:
             return  # measuring FPS for online inference.
@@ -979,6 +1022,16 @@ class FutureMotion(LightningModule):
                 # Empty buffers
                 self.hidden_states_0 = []
                 self.hidden_states_1 = []
+                
+        if self.hparams.control_temperatures and self.hparams.control_vectors_target_emb:
+            for tau in self.hparams.control_temperatures:
+                self.calibration_vals[tau] = np.mean(self.calibration_vals[tau])
+                
+            if self.hparams.save_path_calibration_vals:
+                torch.save(
+                    self.calibration_vals,
+                    f"{self.hparams.save_path_calibration_vals}/calibration_vals.pt"
+                )
 
     def test_step(self, batch: Dict[str, Tensor], batch_idx: int) -> Dict:
         # ! map can be empty for some scenes, check batch["map/valid"]
