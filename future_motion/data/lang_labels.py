@@ -27,25 +27,6 @@ def get_unique_id(
     )
     return unique_id
 
-    try:
-        unique_id = (
-            agent_dict[agent_type] * len(agent_dict)
-            + direction_dict[direction] * len(direction_dict)
-            + speed_dict[speed] * len(speed_dict)
-            + acceleration_dict[acceleration]
-        )
-        return unique_id
-
-    except KeyError:
-        warnings.warn("Encountered undefined class.")
-        # Return 108
-        return (
-            len(agent_dict)
-            * len(direction_dict)
-            * len(speed_dict)
-            * len(acceleration_dict)
-        )
-
 
 def classify_movement(yaw_rate: torch.Tensor, speed: torch.Tensor) -> str:
     """Classifies a given trajectory into one of the following buckets."""
