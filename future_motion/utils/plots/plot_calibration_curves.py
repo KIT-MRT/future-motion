@@ -2,7 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 
 from torchmetrics.functional.regression import pearson_corrcoef
-from future_motion.utils.linearity_measures import straightness_index
+from future_motion.utils.interpretability.linearity_measures import straightness_index
 
 
 def filter_rel_speed(calibration_mean, upper_bound=55, lower_bound=-55, center_tau_at_zero=False):

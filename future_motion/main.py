@@ -18,7 +18,7 @@ from torchmetrics.functional import kl_divergence
 from torchmetrics.functional.regression import pearson_corrcoef, mean_squared_error
 
 from future_motion.utils.trajectories import compute_trajectory_length
-from future_motion.models.modules.neural_collapse import OnlineLinearClassifier
+from future_motion.utils.interpretability.neural_collapse import OnlineLinearClassifier
 from future_motion.models.metrics.representation_eval import std_of_l2_normalized
 from future_motion.models.metrics.regression_collapse import nrc1_feature_collapse, nrc1_feature_collapse_all
 from future_motion.data.lang_labels import (
@@ -27,7 +27,7 @@ from future_motion.data.lang_labels import (
     speed_dict,
     acceleration_dict,
 )
-from future_motion.utils.plot_3d import (
+from future_motion.utils.plots.plot_forecasts_3d import (
     plot_motion_forecasts,
     mplfig_to_npimage,
     tensor_dict_to_cpu,
