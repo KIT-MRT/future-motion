@@ -35,7 +35,7 @@ pre_processing:
     n_map: 128
     n_tl: 24
   ac_global:
-    _target_: data.ac_align.AgentCentricAlign
+    _target_: data.ac_words_in_motion.AgentCentricWordsInMotion
     dropout_p_history: 0.15
     use_current_tl: False
     add_ohe: True

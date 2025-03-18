@@ -56,6 +56,7 @@ class RedMotion(nn.Module):
             n_step_hist=n_step_hist,
             n_pl_node=n_pl_node,
             measure_neural_collapse=self.measure_neural_collapse,
+            control_vectors_target_emb=kwargs.get("control_vectors_target_emb", ''),
             **intra_class_encoder,
         )
 
@@ -164,7 +165,7 @@ class RedMotion(nn.Module):
 
         assert torch.isfinite(conf).all()
         assert torch.isfinite(pred).all()
-
+        
         if self.measure_neural_collapse:
             return valid, conf, pred, target_embs
         else:
@@ -261,6 +262,8 @@ class IntraClassEncoder(nn.Module):
         self.measure_neural_collapse = kwargs.get("measure_neural_collapse")
 
         control_vectors_target_emb = kwargs.get("control_vectors_target_emb", '')
+        
+        print(f"{control_vectors_target_emb = }")
         
         if control_vectors_target_emb:
             self.control_vectors_target_emb = torch.load(control_vectors_target_emb)
@@ -385,7 +388,7 @@ class IntraClassEncoder(nn.Module):
             if self.measure_neural_collapse:
                 target_embs.append(target_emb)
 
-        if self.control_vectors_target_emb is not None:
+        if self.control_vectors_target_emb is not None and self.control_temperature:
             target_emb = self.control_emb(target_emb, self.control_vectors_target_emb.to(target_emb.device), temperature=self.control_temperature) # 32 100
 
         env_emb = torch.cat([map_emb, other_emb], dim=1)

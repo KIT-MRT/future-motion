@@ -15,7 +15,7 @@ from future_motion.data.lang_labels import get_speed_class, get_acceleration_cla
 
 
 
-class AgentCentricAlign(nn.Module):
+class AgentCentricWordsInMotion(nn.Module):
     def __init__(
         self,
         time_step_current: int,
