@@ -118,7 +118,7 @@ We hypothesize that the model has learned a reasonable upper bound for the speed
 @inproceedings{tas2025words,
   title={Words in Motion: Extracting Interpretable Control Vectors for Motion Transformers},
   author={Omer Sahin Tas and Royden Wagner},
-  booktitle={The Thirteenth International Conference on Learning Representations},
+  booktitle={International Conference on Learning Representations (ICLR)},
   year={2025}
 }
 ```
