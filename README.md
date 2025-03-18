@@ -79,15 +79,25 @@ For reference, this [wandb plot](https://wandb.ai/kit-mrt/red-motion-hptr/report
 
 ![Words in Motion](figures/words_in_motion.png "Words in Motion")
 
-Words in Motion is a mechanistic interpretability method for interpreting recent motion transformer models.
-
-**(a)** We classify motion features in an interpretable way, as in natural language.
-
-**(b)** We measure the degree to which these interpretable features are embedded in the hidden states $H_i$ of transformer models with linear probes.
-Furthermore, we use our discrete features to fit interpretable control vectors $V_i$ that allow for controlling motion forecasts at inference.
+**Words in Motion.** (a) We classify motion features in an interpretable way, as in natural language. (b) We measure the degree to which these interpretable features are embedded in the hidden states $H_{i,:}$ of transformer models with linear probes. Furthermore, we use our discrete features and sparse autoencoding to fit interpretable control vectors $V_{i,:}$ that allow for modifying motion forecasts at inference. The training of the sparse autoencoder is shown with red arrows ($\textcolor{#f1615c}{\rightarrow}$) and the fitting of control vectors with blue arrows ($\textcolor{#5eb8e7}{\rightarrow}$).
 
 <details>
 <summary><big><b>More details</b></big></summary>
+
+
+<big><b>Contributions</b></big>
+
+* We argue that, to fit control vectors, latent space regularities with separable features are necessary. We use linear probing and show that neural collapse toward interpretable features occurs in
+hidden states of recent motion transformers, indicating a structured latent space.
+* We fit control vectors using hidden states with opposing features. By modifying hidden states
+at inference, we show that control vectors describe functionally important directions. Similar
+to the vector arithmetic in _word2vec_, we obtain predictions consistent with the current driving
+environment.
+* We use sparse autoencoders to optimize our control vectors. Notably, enforcing sparsity leads to
+more linear changes in predictions when scaling control vectors. We use linearity measures to
+compare these results against a Koopman autoencoder and evaluate the effects of various layers
+and activation functions, including convolutional and MLPMixer layers.
+
 
 <big><b>Gradio demos</b></big>
 
@@ -103,9 +113,15 @@ We hypothesize that the model has learned a reasonable upper bound for the speed
 
 ![Words in Motion Demo](figures/words_in_motion_gradio_demo.png "Words in Motion Demo")
 
-<big><b>Training</b></big>
-
-Soon to be released.
+<big><b>Reference</b></big>
+```bibtex
+@inproceedings{tas2025words,
+  title={Words in Motion: Extracting Interpretable Control Vectors for Motion Transformers},
+  author={Omer Sahin Tas and Royden Wagner},
+  booktitle={The Thirteenth International Conference on Learning Representations},
+  year={2025}
+}
+```
 
 </details>
 
