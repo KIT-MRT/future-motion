@@ -79,25 +79,15 @@ class FutureMotion(LightningModule):
         save_path_target_input_and_embs: str = "",
         control_vectors_target_emb: str = "",
         save_path_calibration_vals: str = "",
+        print_global_hparams: bool = False,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
 
-        # Is there a log hparams function?
-        print(f"{time_step_end = }")
-        print(f"{time_step_current = }")
-        print(f"{pairwise_joint = }")
-        print(f"{eval_pairwise_joint = }")
-        print(f"{measure_dct_reconstruction_error = }")
-        print(f"{loss_weight_dbl_decoding = }")
-        print(f"{additive_decoding = }")
-        print(f"{pred_1_global = }")
-        print(f"{edit_pred_0 = }")
-        print(f"{agent_0_as_global_ref = }")
-        print(f"{measure_neural_regression_collapse = }")
-        print(f"{plot_pred_0 = }")
-        print(f"{save_path_pred_dict = }")
-        print(f"{save_path_target_input_and_embs = }")
+        if print_global_hparams:
+            for key, val in self.hparams.items():
+                if type(val) in (type(""), type(True)) and val != "":
+                    print(f"{key} = {val}")
 
         # pre_processing
         self.pre_processing = []
