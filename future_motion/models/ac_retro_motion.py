@@ -996,7 +996,6 @@ class DualDecoder(nn.Module):
         if additive_decoding:
             pred_1 = pred_0[..., :2, :, :, :] + pred_1
 
-        # if return_last_hidden_state:
         return (
             conf_0,
             pred_0,
