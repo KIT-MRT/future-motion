@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 
 from sklearn.decomposition import PCA
@@ -10,7 +11,9 @@ def project_onto_direction(H, direction):
     return (H @ direction) / mag
 
 
-def fit_control_vector(layer_hiddens, idx=-1, autoencoder=None):
+def fit_control_vector(
+    layer_hiddens, idx=-1, autoencoder=None, verbose_explained_variance=False
+):
     """
     Fit control vectors to hidden states with opposing features (e.g., low and high speed)
 
@@ -37,6 +40,11 @@ def fit_control_vector(layer_hiddens, idx=-1, autoencoder=None):
     pca_model = PCA(n_components=1, whiten=False).fit(train_diff)
 
     directions = pca_model.components_.astype(np.float32).squeeze(axis=0)
+
+    if verbose_explained_variance:
+        pca_model = PCA(n_components=10, whiten=False).fit(train_diff)
+        explained_variance = pca_model.explained_variance_ratio_.astype(np.float32)
+        print(f"explained variance: {explained_variance}")
 
     if autoencoder:
         directions = (
