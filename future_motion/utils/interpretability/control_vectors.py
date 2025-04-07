@@ -11,11 +11,30 @@ def project_onto_direction(H, direction):
     return (H @ direction) / mag
 
 
+def flip_direction(layer_hiddens, directions):
+    # get the positive-negative switch context length
+    k = layer_hiddens.shape[0]
+
+    projected_hiddens = project_onto_direction(layer_hiddens, directions)
+
+    positive_smaller_mean = np.mean(
+        [projected_hiddens[i] < projected_hiddens[k // 2 + i] for i in range(0, k // 2)]
+    )
+    positive_larger_mean = np.mean(
+        [projected_hiddens[i] > projected_hiddens[k // 2 + 1] for i in range(0, k // 2)]
+    )
+    if positive_smaller_mean > positive_larger_mean:
+        directions *= -1
+
+    return directions
+
+
 def fit_control_vector(
     layer_hiddens, idx=-1, autoencoder=None, verbose_explained_variance=False
 ):
     """
     Fit control vectors to hidden states with opposing features (e.g., low and high speed)
+    Default timestep is the last token; i.e. idx=-1
 
     Adapted from https://github.com/vgel/repeng
     """
@@ -54,16 +73,5 @@ def fit_control_vector(
             .numpy()
         )
 
-    projected_hiddens = project_onto_direction(h, directions)
-
-    positive_smaller_mean = np.mean(
-        [projected_hiddens[i] < projected_hiddens[n // 2 + i] for i in range(0, n // 2)]
-    )
-    positive_larger_mean = np.mean(
-        [projected_hiddens[i] > projected_hiddens[n // 2 + 1] for i in range(0, n // 2)]
-    )
-
-    if positive_smaller_mean > positive_larger_mean:
-        directions *= -1
-
-    return directions
+    # flip the vector to if neccessary
+    return flip_direction(h, directions)
