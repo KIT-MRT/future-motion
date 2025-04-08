@@ -26,7 +26,9 @@ class OnlineLinearClassifier(LightningModule):
         self.criterion = CrossEntropyLoss()
 
     def forward(self, x: Tensor) -> Tensor:
-        return self.classification_head(x.detach().flatten(start_dim=1)) # flatten needed? -> doesn't change (8, 256) -> (8, 256)
+        return self.classification_head(
+            x.detach().flatten(start_dim=1)
+        )  # flatten needed? -> doesn't change (8, 256) -> (8, 256)
 
     def shared_step(self, batch, batch_idx) -> Tuple[Tensor, Dict[int, Tensor]]:
         features, targets = batch[0], batch[1]
@@ -39,15 +41,22 @@ class OnlineLinearClassifier(LightningModule):
     def training_step(self, batch, batch_idx) -> Tuple[Tensor, Dict[str, Tensor]]:
         loss, topk = self.shared_step(batch=batch, batch_idx=batch_idx)
         log_dict = {f"train_{self.log_prefix}_online_cls_loss": loss}
-        log_dict.update({f"train_{self.log_prefix}_online_cls_top{k}": acc for k, acc in topk.items()})
+        log_dict.update(
+            {
+                f"train_{self.log_prefix}_online_cls_top{k}": acc
+                for k, acc in topk.items()
+            }
+        )
         return loss, log_dict
 
     def validation_step(self, batch, batch_idx) -> Tuple[Tensor, Dict[str, Tensor]]:
         loss, topk = self.shared_step(batch=batch, batch_idx=batch_idx)
         log_dict = {f"val_{self.log_prefix}_online_cls_loss": loss}
-        log_dict.update({f"val_{self.log_prefix}_online_cls_top{k}": acc for k, acc in topk.items()})
+        log_dict.update(
+            {f"val_{self.log_prefix}_online_cls_top{k}": acc for k, acc in topk.items()}
+        )
         return loss, log_dict
-    
+
 
 def mean_topk_accuracy(
     predicted_classes: Tensor, targets: Tensor, k: Sequence[int]
