@@ -1102,9 +1102,64 @@ class FutureMotion(LightningModule):
             k.split("input/")[-1]: v for k, v in batch.items() if "input/" in k
         }
         pred_dict = {k.replace("/", "_"): v for k, v in batch.items() if "ref/" in k}
-        pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"] = self.model(
-            **input_dict
-        )
+        
+        if self.hparams.dbl_decoding:
+            pred_dict_0 = copy.deepcopy(pred_dict)
+
+            (
+                pred_dict_0["pred_valid"],
+                pred_dict_0["pred_conf"],
+                pred_dict_0["pred"],
+                pred_dict["pred_valid"],
+                pred_dict["pred_conf"],
+                pred_dict["pred"],
+                pred_dict["to_predict"],
+                last_hidden_state_0,
+                last_hidden_state_1,
+            ) = self.model(
+                **input_dict,
+                ref_role=pred_dict["ref_role"],
+                pairwise_joint=self.hparams.pairwise_joint,
+                additive_decoding=self.hparams.additive_decoding,
+                pred_1_global=self.hparams.pred_1_global,
+                pred_1_skip_context=self.hparams.pred_1_skip_context,
+                edit_pred_0=self.hparams.edit_pred_0,
+                agent_0_as_global_ref=self.hparams.agent_0_as_global_ref,
+            )
+            
+            if self.hparams.pairwise_joint:
+                n_dec, n_scene, n_target, n_pred = pred_dict["pred_conf"].shape
+                to_predict = pred_dict["to_predict"]
+
+                pred_dict["ref_pos"] = pred_dict["ref_pos"][to_predict]
+                pred_dict["ref_rot"] = pred_dict["ref_rot"][to_predict]
+                pred_dict["ref_type"] = pred_dict["ref_type"][to_predict]
+                pred_dict["ref_idx"] = pred_dict["ref_idx"][to_predict]
+                pred_dict["ref_pos"] = rearrange(
+                    pred_dict["ref_pos"],
+                    "(n_scene n_target) ... -> n_scene n_target ...",
+                    n_scene=n_scene,
+                )
+                pred_dict["ref_rot"] = rearrange(
+                    pred_dict["ref_rot"],
+                    "(n_scene n_target) ... -> n_scene n_target ...",
+                    n_scene=n_scene,
+                )
+                pred_dict["ref_type"] = rearrange(
+                    pred_dict["ref_type"],
+                    "(n_scene n_target) ... -> n_scene n_target ...",
+                    n_scene=n_scene,
+                )
+                pred_dict["ref_idx"] = rearrange(
+                    pred_dict["ref_idx"],
+                    "(n_scene n_target) ... -> n_scene n_target ...",
+                    n_scene=n_scene,
+                )
+        else:
+            pred_dict["pred_valid"], pred_dict["pred_conf"], pred_dict["pred"] = self.model(
+                **input_dict
+            )
+
         pred_dict = self.post_processing(pred_dict)
 
         return pred_dict
