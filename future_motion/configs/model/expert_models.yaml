@@ -1,0 +1,33 @@
+_target_: future_motion.expert_models.FutureMotionExpertModels
+
+# The veh model is used to compute metrics and save submission files
+# (after merging preds from all models)
+veh_model_config:
+  ckpt_path: PATH_TO_LOCAL_CHECKPOINT
+  _target_: future_motion.main.FutureMotion
+  model_overrides: 
+    measure_neural_regression_collapse: False
+    interactive_challenge: True
+    sub_womd: ${...sub_womd}
+
+ped_model_config:
+  ckpt_path: PATH_TO_LOCAL_CHECKPOINT
+  _target_: future_motion.main.FutureMotion
+  model_overrides:
+    measure_neural_regression_collapse: False
+
+cyc_model_config:
+  ckpt_path: PATH_TO_LOCAL_CHECKPOINT
+  _target_: future_motion.main.FutureMotion
+  model_overrides:
+    measure_neural_regression_collapse: False
+
+sub_womd:
+  _target_: hptr_modules.utils.submission.SubWOMD
+  activate: True
+  method_name: METHOD_NAME
+  authors: [NAME1, NAME2]
+  affiliation: AFFILIATION
+  description: DESC
+  method_link: METHOD_LINK
+  account_name: ACCOUNT_NAME
