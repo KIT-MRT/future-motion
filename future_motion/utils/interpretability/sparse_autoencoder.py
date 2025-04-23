@@ -48,9 +48,8 @@ class SAE(pl.LightningModule):
         return x_recon
 
     def training_step(self, batch, batch_idx):
-        # Merge first two dims since the dataloader batches already batched data
-        # (batched over scenes)
-        batch = rearrange(batch, "n_batch n_scene ... -> (n_batch n_scene) ...")
+        # In an autoencoder the input is the same as labels
+        batch = batch[0]
 
         s = self.encode(batch)
         x_recon = self.decode(s)
