@@ -7,7 +7,14 @@ from einops import rearrange
 
 
 class SAE(pl.LightningModule):
-    def __init__(self, input_dim, latent_dim, sparsity_coeff=3e-4, learning_rate=1e-3):
+    def __init__(
+        self,
+        input_dim,
+        latent_dim,
+        max_epochs=10000,
+        sparsity_coeff=3e-4,
+        learning_rate=1e-3,
+    ):
         super().__init__()
         self.w_enc = nn.Parameter(
             torch.nn.init.kaiming_uniform_(
