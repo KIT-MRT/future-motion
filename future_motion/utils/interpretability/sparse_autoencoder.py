@@ -33,6 +33,11 @@ class SAE(pl.LightningModule):
 
         self.save_hyperparameters()
 
+        self.loss = []
+        self.l1_loss = []
+        self.l2_loss = []
+        self.reconst_loss = []
+
     def encode(self, x):
         x = x - self.b_dec
         s = torch.matmul(x, self.w_enc) + self.b_enc
@@ -63,15 +68,37 @@ class SAE(pl.LightningModule):
 
         total_recon_loss = (batch - x_recon) ** 2
 
-        self.log("l2_loss", l2_loss.mean(dim=0))
-        self.log("l1_loss", l1_loss.mean(dim=0))
-        self.log("total_recon_loss", total_recon_loss.mean())
-        self.log("loss", loss)
+        self.loss.append(loss)
+        self.l1_loss.append(l1_loss.mean(dim=0))
+        self.l2_loss.append(l2_loss.mean(dim=0))
+        self.reconst_loss.append(total_recon_loss.mean(dim=0))
+
+        # Log the metric for checkpointing
+        avg_total_loss = torch.stack(self.loss).mean()
+        self.log("loss", avg_total_loss, prog_bar=True)
 
         return loss
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
+
+    def on_train_epoch_end(self) -> None:
+        avg_total_loss = torch.stack(self.loss).mean()
+        avg_l1_loss = torch.stack(self.l1_loss).mean()
+        avg_l2_loss = torch.stack(self.l2_loss).mean()
+        avg_reconst_loss = torch.stack(self.reconst_loss).mean()
+
+        # Prepare log messages
+        self.log("loss", avg_total_loss, sync_dist=True)
+        self.log("l1_loss", avg_l1_loss, sync_dist=True)
+        self.log("l2_loss", avg_l2_loss, sync_dist=True)
+        self.log("reconstruction_loss", avg_reconst_loss, sync_dist=True)
+
+        # Reset loss trackers for the next epoch
+        self.loss = []
+        self.l1_loss = []
+        self.l2_loss = []
+        self.reconst_loss = []
 
 
 class CunninghamSAE(pl.LightningModule):
