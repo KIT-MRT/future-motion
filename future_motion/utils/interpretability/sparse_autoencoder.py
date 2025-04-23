@@ -6,30 +6,93 @@ from torch import nn
 from einops import rearrange
 
 
+class JumpReLU(nn.Module):
+    def __init__(self, threshold=0.0):
+        super(JumpReLU, self).__init__()
+        self.threshold = threshold
+
+    def forward(self, x):
+        return torch.where(x > self.threshold, x, torch.zeros_like(x))
+
+
 class SAE(pl.LightningModule):
     def __init__(
         self,
         input_dim,
         latent_dim,
+        use_jumprelu=False,
+        layer_type="MLP",
+        kernel_size=4,
         max_epochs=10000,
         sparsity_coeff=3e-4,
         learning_rate=1e-3,
     ):
         super().__init__()
-        self.w_enc = nn.Parameter(
-            torch.nn.init.kaiming_uniform_(
-                torch.empty(input_dim, latent_dim, dtype=torch.float32)
-            )
-        )
-        self.b_enc = nn.Parameter(torch.zeros(latent_dim, dtype=torch.float32))
+        assert layer_type in ["MLP", "Conv", "MLP-Mixer"]
+        assert not kernel_size % 2
+        self.act_fn = "JumpReLU" if use_jumprelu else "ReLU"
+        self.layer_type = layer_type
+        self.kernel_size = kernel_size
+        dict_mult = latent_dim / input_dim
 
-        self.w_dec = nn.Parameter(
-            torch.nn.init.kaiming_uniform_(
-                torch.empty(latent_dim, input_dim, dtype=torch.float32)
+        if layer_type == "MLP":
+            self.w_enc = nn.Parameter(
+                torch.nn.init.kaiming_uniform_(
+                    torch.empty(input_dim, latent_dim, dtype=torch.float32)
+                )
             )
-        )
-        self.w_dec.data[:] = self.w_dec / self.w_dec.norm(dim=-1, keepdim=True)
-        self.b_dec = nn.Parameter(torch.zeros(input_dim, dtype=torch.float32))
+            self.b_enc = nn.Parameter(torch.zeros(latent_dim, dtype=torch.float32))
+
+            self.w_dec = nn.Parameter(
+                torch.nn.init.kaiming_uniform_(
+                    torch.empty(latent_dim, input_dim, dtype=torch.float32)
+                )
+            )
+            self.w_dec.data[:] = self.w_dec / self.w_dec.norm(dim=-1, keepdim=True)
+            self.b_dec = nn.Parameter(torch.zeros(input_dim, dtype=torch.float32))
+
+        elif layer_type == "Conv":
+            if dict_mult >= 1:
+                self.enc = nn.ConvTranspose1d(
+                    stride=(dict_mult,),
+                    in_channels=1,
+                    out_channels=1,
+                    kernel_size=kernel_size,
+                )
+                self.dec = nn.Conv1d(
+                    stride=(dict_mult,),
+                    in_channels=1,
+                    out_channels=1,
+                    kernel_size=kernel_size,
+                )
+            else:
+                stride = int(1 / dict_mult)
+                self.enc = nn.Conv1d(
+                    stride=(stride,),
+                    in_channels=1,
+                    out_channels=1,
+                    kernel_size=kernel_size,
+                )
+                self.dec = nn.ConvTranspose1d(
+                    stride=(stride,),
+                    in_channels=1,
+                    out_channels=1,
+                    kernel_size=kernel_size,
+                )
+
+        elif layer_type == "MLP-Mixer":
+            self.enc = nn.Conv1d(
+                in_channels=1,
+                out_channels=int(d_mlp * dict_mult),
+                kernel_size=kernel_size,
+                stride=(d_mlp - kernel_size) + 1,
+            )
+            self.dec = nn.Conv1d(
+                in_channels=1,
+                out_channels=d_mlp,
+                kernel_size=int(d_mlp * dict_mult),
+                stride=(d_mlp - kernel_size) + 1,
+            )
 
         self.save_hyperparameters()
 
@@ -39,13 +102,52 @@ class SAE(pl.LightningModule):
         self.reconst_loss = []
 
     def encode(self, x):
-        x = x - self.b_dec
-        s = torch.matmul(x, self.w_enc) + self.b_enc
-        s = torch.relu(s)
+        if self.layer_type == "MLP":
+            x = x - self.b_dec
+            s = torch.matmul(x, self.w_enc) + self.b_enc
+
+        elif self.layer_type == "Conv":
+            if len(x.shape) == 3:
+                x = rearrange(x, "b b2 d -> (b b2) 1 d")
+            elif len(x.shape) == 2:
+                x = rearrange(x, "b d -> b 1 d")
+            s = self.enc(x)
+
+        elif self.layer_type == "MLP-Mixer":
+            if len(x.shape) == 3:
+                x = rearrange(x, "b b2 d -> (b b2) 1 d")
+            elif len(x.shape) == 2:
+                x = rearrange(x, "b d -> b 1 d")
+
+            s = self.enc(x - self.dec.bias)
+            s = rearrange(s, "b c 1 -> b 1 c")
+
+        if self.act_fn == "ReLU":
+            s = torch.relu(s)
+        elif self.act_fn == "JumpReLU":
+            s = JumpReLU(threshold=0.001)(s)
+
         return s
 
     def decode(self, x):
-        return torch.matmul(x, self.w_dec) + self.b_dec
+        if self.layer_type == "MLP":
+            return torch.matmul(x, self.w_dec) + self.b_dec
+
+        elif self.layer_type == "Conv":
+            x = self.dec(x)
+            if self.training:
+                x = rearrange(x, "(b b2) 1 d -> b b2 d", b=32, b2=48)
+            elif not self.training:
+                x = rearrange(x, "b 1 d -> b d")
+            return x
+
+        elif self.layer_type == "MLP-Mixer":
+            x = self.dec(x)
+            if self.training:
+                x = rearrange(x, "(b b2) d 1 -> b b2 d", b=32, b2=48)
+            elif not self.training:
+                x = rearrange(x, "b d 1 -> b d")
+            return x
 
     def forward(self, x):
         s = self.encode(x)
