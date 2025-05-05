@@ -3,7 +3,7 @@ _target_: future_motion.main.FutureMotion
 time_step_current: 10
 time_step_end: 90
 n_video_batch: 3
-interactive_challenge: True
+interactive_challenge: False
 inference_cache_map: False
 inference_repeat_n: 1
 plot_motion: False
@@ -11,7 +11,7 @@ use_nav_loss: ${use_nav_loss}
 
 model:
   _target_: future_motion.models.ac_scene_motion.SceneMotion
-  hidden_dim: 256
+  hidden_dim: 128
   n_decoders: 1
   use_ego_nav: ${use_ego_nav}
   nav_with_route: ${nav_with_route}
@@ -46,7 +46,7 @@ model:
     n_layer: 6
   motion_decoder:
     _target_: future_motion.models.ac_wayformer.Decoder
-    n_decoder_layers: 8 
+    n_decoder_layers: 8
     n_pred: 6
     multi_modal_anchors:
       use_agent_type: False # Opt, test with as well
