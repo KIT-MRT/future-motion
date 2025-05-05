@@ -112,7 +112,7 @@ class EgoPlanningMetrics(NllMetrics):
             n_decoder, n_scene, 1, n_pred, n_step_future, 2, 2
         )
         ego_batch["ref_role"] = ref_role[ego_mask[0]].view(n_scene, 1, 3)
-        ego_batch["ref_type"] = ref_type[ego_mask[0]].view(n_scene, 1, 3)
+        ego_batch["ref_type"] = ref_type[ego_mask[0]].view(n_scene, 1, 4)
         ego_batch["gt_valid"] = gt_valid[ego_mask[0]].view(n_scene, 1, n_step_future)
         ego_batch["gt_pos"] = gt_pos[ego_mask[0]].view(n_scene, 1, n_step_future, 2)
         ego_batch["gt_spd"] = gt_spd[ego_mask[0]].view(n_scene, 1, n_step_future, 1)

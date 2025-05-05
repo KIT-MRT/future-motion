@@ -61,7 +61,7 @@ class WaymoEgoMetrics(WaymoMetrics):
             n_scene, n_step, 1, 1
         )
         ego_batch["agent/role"] = agent_role[ego_mask].view(n_scene, 1, 3)
-        ego_batch["agent/type"] = agent_type[ego_mask].view(n_scene, 1, 3)
+        ego_batch["agent/type"] = agent_type[ego_mask].view(n_scene, 1, 4)
         ego_batch["agent/size"] = agent_size[ego_mask].view(n_scene, 1, 3)
 
         ego_pred_traj = pred_traj[ego_mask_n_step_future].view(

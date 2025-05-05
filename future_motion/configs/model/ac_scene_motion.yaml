@@ -69,13 +69,13 @@ train_metric:
   winner_takes_all: joint_hard1 # none, or (joint) + hard + (1-6), or cmd
   l_pos: nll_torch # nll_torch, nll_mtr, huber, l2
   p_rand_train_agent: -1 # 0.2
-  n_step_add_train_agent: [-1, -1, -1] # -1 to turn off
-  focal_gamma_conf: [0.0, 0.0, 0.0] # 0.0 to turn off
-  w_conf: [1.0, 1.0, 1.0] # veh, ped, cyc
-  w_pos: [1.0, 1.0, 1.0]
-  w_yaw: [1.0, 1.0, 1.0]
-  w_vel: [1.0, 1.0, 1.0]
-  w_spd: [0, 0, 0]
+  n_step_add_train_agent: [-1, -1, -1, -1] # -1 to turn off
+  focal_gamma_conf: [0.0, 0.0, 0.0, 0.0] # 0.0 to turn off
+  w_conf: [1.0, 1.0, 1.0, 1.0] # veh, ped, cyc, static obj
+  w_pos: [1.0, 1.0, 1.0, 1.0]
+  w_yaw: [1.0, 1.0, 1.0, 1.0]
+  w_vel: [1.0, 1.0, 1.0, 1.0]
+  w_spd: [0, 0, 0, 0]
   nav_with_route: ${nav_with_route}
   nav_with_goal: ${nav_with_goal}
 
