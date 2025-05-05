@@ -7,6 +7,7 @@ interactive_challenge: True
 inference_cache_map: False
 inference_repeat_n: 1
 plot_motion: False
+use_nav_loss: ${use_nav_loss}
 
 model:
   _target_: future_motion.models.ac_scene_motion.SceneMotion

@@ -40,6 +40,7 @@ class FutureMotion(LightningModule):
         plot_motion: bool = True,
         control_temperatures: list = [-20, -10, 0, 10, 20],
         pre_training: bool = False,
+        use_nav_loss: bool = False,
     ) -> None:
         super().__init__()
         self.save_hyperparameters()
@@ -311,10 +312,12 @@ class FutureMotion(LightningModule):
 
             return metrics_dict[f"{self.train_metric.prefix}/loss"] + linear_loss
 
-        return (
-            metrics_dict[f"{self.train_metric.prefix}/loss"]
-            + metrics_dict[f"{self.train_metric.ego_loss_prefix}/loss"]
-        )
+        if self.hparams.use_nav_loss:
+            return (
+                metrics_dict[f"{self.train_metric.prefix}/loss"]
+                + metrics_dict[f"{self.train_metric.ego_loss_prefix}/loss"]
+            )
+        return metrics_dict[f"{self.train_metric.prefix}/loss"]
 
     def validation_step(self, batch: Dict[str, Tensor], batch_idx: int) -> Dict:
         for _ in range(self.hparams.inference_repeat_n):
