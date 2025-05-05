@@ -33,19 +33,28 @@ class EgoPlanningMetrics(NllMetrics):
     This Loss build upon the NllMetrics class and extends it with additional metrics for ego planning.
     """
 
-    def __init__(self, nav_with_route, nav_with_goal, *args, **kwargs) -> None:
+    def __init__(
+        self, use_nav_loss, nav_with_route, nav_with_goal, *args, **kwargs
+    ) -> None:
         super().__init__(*args, **kwargs)
-        self.nav_with_route = nav_with_route
-        self.nav_with_goal = False  # nav_with_goal: GoalLoss must be improved with e.g. GAR loss before usage!
+        self.use_nav_loss = use_nav_loss
 
-        self.ego_loss_prefix = f"{self.prefix}/ego"
-        del kwargs["prefix"]
+        if use_nav_loss:
+            self.nav_with_route = nav_with_route
+            self.nav_with_goal = False  # nav_with_goal: GoalLoss must be improved with e.g. GAR loss before usage!
 
-        self.route_loss = RouteLoss(prefix=self.ego_loss_prefix, **kwargs)
-        self.goal_loss = GoalLoss(prefix=self.ego_loss_prefix, **kwargs)
+            self.ego_loss_prefix = f"{self.prefix}/ego"
+            del kwargs["prefix"]
 
-        self.add_state("ego_route_loss", default=torch.tensor(0), dist_reduce_fx="sum")
-        self.add_state("ego_goal_loss", default=torch.tensor(0), dist_reduce_fx="sum")
+            self.route_loss = RouteLoss(prefix=self.ego_loss_prefix, **kwargs)
+            self.goal_loss = GoalLoss(prefix=self.ego_loss_prefix, **kwargs)
+
+            self.add_state(
+                "ego_route_loss", default=torch.tensor(0), dist_reduce_fx="sum"
+            )
+            self.add_state(
+                "ego_goal_loss", default=torch.tensor(0), dist_reduce_fx="sum"
+            )
 
     def ego_preprocessing(
         self,
@@ -147,24 +156,24 @@ class EgoPlanningMetrics(NllMetrics):
     def forward(self, **kwargs) -> Dict[str, Tensor]:
         loss_dict = super().forward(**kwargs)
 
-        # ! ego preprocessing
-        ego_batch = self.ego_preprocessing(**kwargs)
+        if self.use_nav_loss:
+            # ! ego preprocessing
+            ego_batch = self.ego_preprocessing(**kwargs)
 
-        # ! ego planning loss
-        ego_nav_loss = 0
-        if self.nav_with_route:
-            ego_route_loss_dict = self.route_loss.forward(**ego_batch)
-            ego_route_loss = ego_route_loss_dict[f"{self.ego_loss_prefix}/loss"]
-            loss_dict[f"{self.ego_loss_prefix}/route_loss"] = ego_route_loss
-            ego_nav_loss += ego_route_loss
-        if self.nav_with_goal:
-            ego_goal_loss_dict = self.goal_loss.forward(**ego_batch)
-            ego_goal_loss = ego_goal_loss_dict[f"{self.ego_loss_prefix}/loss"]
-            loss_dict[f"{self.ego_loss_prefix}/goal_loss"] = ego_goal_loss
-            ego_nav_loss += ego_goal_loss
+            # ! ego planning loss
+            ego_planning_loss = 0
+            if self.nav_with_route:
+                ego_route_loss_dict = self.route_loss.forward(**ego_batch)
+                ego_route_loss = ego_route_loss_dict[f"{self.ego_loss_prefix}/loss"]
+                loss_dict[f"{self.ego_loss_prefix}/route_loss"] = ego_route_loss
+                ego_planning_loss += ego_route_loss
+            if self.nav_with_goal:
+                ego_goal_loss_dict = self.goal_loss.forward(**ego_batch)
+                ego_goal_loss = ego_goal_loss_dict[f"{self.ego_loss_prefix}/loss"]
+                loss_dict[f"{self.ego_loss_prefix}/goal_loss"] = ego_goal_loss
+                ego_planning_loss += ego_goal_loss
 
-        ego_planning_loss = ego_nav_loss
-        loss_dict[f"{self.ego_loss_prefix}/loss"] = ego_planning_loss
+            loss_dict[f"{self.ego_loss_prefix}/loss"] = 0.1 * ego_planning_loss
         return loss_dict
 
 
@@ -188,6 +197,8 @@ class RouteLoss(Metric):
         gt_map_on_route: Tensor,
         **kwargs,
     ) -> None:
+        self.loss = torch.tensor(0.0, device=self.loss.device)
+
         n_decoder, n_scene, n_agent, n_pred, n_step_future, _ = pred_pos.shape
         self.n_scene = n_scene
         self.n_pred = n_pred
@@ -210,55 +221,49 @@ class RouteLoss(Metric):
             (gt_map_on_route[..., 0] == 1).unsqueeze(-1).expand(-1, -1, n_pl_node)
         )
         map_on_route_and_valid = gt_map_valid & map_on_route_mask
-        agent_indices = torch.arange(n_agent).unsqueeze(1).expand(n_agent, n_pred)
-        pred_indices = torch.arange(n_pred).unsqueeze(0).expand(n_agent, n_pred)
-        distance_to_route_sum = 0
         for i in range(n_decoder):
             for j in range(n_scene):
                 if map_on_route_and_valid[j].sum() == 0:
                     return
+                # Find the most likely prediction based on pred_conf
+                most_likely_pred_idx = torch.argmax(pred_conf[i, j, 0])
+
                 # Find the last valid index along n_step_future
-                # Using torch.where to find valid indices, then taking the max index per [n_agent, n_pred]
-                last_valid_indices = torch.argmax(
-                    avails.int()[i, j].flip(dims=[-1]), dim=-1
+                last_valid_index = torch.argmax(
+                    avails.int()[i, j, 0, most_likely_pred_idx].flip(dims=[-1]), dim=-1
                 )
-                last_valid_indices = (
-                    n_step_future - 1 - last_valid_indices
+                last_valid_index = (
+                    n_step_future - 1 - last_valid_index
                 )  # Convert flipped indices to original indices
 
                 final_pred_pos = pred_pos[
-                    i, j, agent_indices, pred_indices, last_valid_indices, :
-                ].squeeze(0)
+                    i, j, 0, most_likely_pred_idx, last_valid_index, :
+                ]
 
-                for pos in final_pred_pos:
-                    relevant_points_on_route = find_nearest_polyline_point(
-                        gt_map_pos[j], map_on_route_and_valid[j], pos
+                relevant_points_on_route = find_nearest_polyline_point(
+                    gt_map_pos[j], map_on_route_and_valid[j], final_pred_pos
+                )
+                nearest_point = relevant_points_on_route["nearest_point"]
+                predecessor = relevant_points_on_route.get("predecessor")
+                successor = relevant_points_on_route.get("successor")
+
+                if predecessor is None and successor is None:
+                    print("Only one point in nearest polyline")
+                    distance_to_route = torch.norm(final_pred_pos - nearest_point)
+                else:
+                    # If predecessor or successor is None, use nearest_point as fallback
+                    predecessor = (
+                        predecessor if predecessor is not None else nearest_point
                     )
-                    nearest_point = relevant_points_on_route["nearest_point"]
-                    nearest_point_predecessor = relevant_points_on_route["predecessor"]
-                    nearest_point_successor = relevant_points_on_route["successor"]
-                    if (
-                        nearest_point_predecessor is None
-                        and nearest_point_successor is None
-                    ):
-                        # TODO: not sure about this
-                        print("Only one point in nearest polyline")
-                        distance_to_route += torch.sqrt(
-                            torch.sum((pos - nearest_point) ** 2)
-                        )
-                    elif nearest_point_predecessor is None:
-                        nearest_point_predecessor = nearest_point
-                    elif nearest_point_successor is None:
-                        nearest_point_successor = nearest_point
+                    successor = successor if successor is not None else nearest_point
                     distance_to_route = normal_distance_to_line(
-                        pos, nearest_point_predecessor, nearest_point_successor
+                        final_pred_pos, predecessor, successor
                     )
-                    route_gar_loss = gar_loss(distance_to_route, -100, 5)
-                    distance_to_route_sum += route_gar_loss
-        self.loss = distance_to_route_sum
+
+                    self.loss += gar_loss(distance_to_route, -5, 3)
 
     def compute(self) -> Dict[str, Tensor]:
-        # Compute the average Chamfer loss across all samples
+        # Compute the average loss across all samples
         route_loss = self.loss / (self.n_decoders * self.n_scene * self.n_pred)
 
         # Return the loss as a dictionary

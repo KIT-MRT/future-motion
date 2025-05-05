@@ -76,6 +76,7 @@ train_metric:
   w_yaw: [1.0, 1.0, 1.0, 1.0]
   w_vel: [1.0, 1.0, 1.0, 1.0]
   w_spd: [0, 0, 0, 0]
+  use_nav_loss: ${use_nav_loss}
   nav_with_route: ${nav_with_route}
   nav_with_goal: ${nav_with_goal}
 
