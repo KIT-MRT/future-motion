@@ -43,7 +43,7 @@ Prepare Waymo Open Motion and Argoverse 2 Forecasting datasets by following the 
 
 ![RetroMotion](figures/retro_motion.png "RetroMotion")
 
-**From marginal to joint trajectories.** We use an MLP to generate query matrices $Q$ from marginal trajectories and exchange information between queries and scene context with attention mechanisms Afterwards, we decode joint trajectories $\mathcal{P}^{\text{joint}}_{1:T}$ from pairs of queries at the same index. This compresses information from all $K^2$ possible combinations into $K$ query pairs.Furthermore, this includes a retrocausal flow of information from later points in marginal trajectories to earlier points in joint trajectories. Notably, this enables us to issue intructions by modifying marginal trajectories [(Wagner et al. 2025)](http://arxiv.org/abs/2505.20414).
+**From marginal to joint trajectories.** We use an MLP to generate query matrices $Q$ from marginal trajectories and exchange information between queries and scene context with attention mechanisms Afterwards, we decode joint trajectories $\mathcal{P}^{\text{joint}}_{1:T}$ from pairs of queries at the same index. This compresses information from all $K^2$ possible combinations into $K$ query pairs. Furthermore, this includes a retrocausal flow of information from later points in marginal trajectories to earlier points in joint trajectories. Notably, this enables us to issue intructions by modifying marginal trajectories [(Wagner et al. 2025)](http://arxiv.org/abs/2505.20414).
 
 <details>
 <summary><big><b>More details</b></big></summary>
