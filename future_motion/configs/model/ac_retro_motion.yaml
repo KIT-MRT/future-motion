@@ -127,6 +127,8 @@ post_processing:
     gt_in_local: True
     use_mpa_multiagent: True
     normalize_across_agents: False
+    topk_after_mpa_nms: False
+    topk_aggregate_conf: False
 
 
 # opt. comment out for "legacy" bash training scripts
@@ -149,6 +151,8 @@ post_processing_0:
     gt_in_local: True
     use_mpa_multiagent: False
     normalize_across_agents: False
+    topk_after_mpa_nms: False
+    topk_aggregate_conf: False
 
 
 optimizer:
