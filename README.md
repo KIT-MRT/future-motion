@@ -39,6 +39,21 @@ Prepare Waymo Open Motion and Argoverse 2 Forecasting datasets by following the 
 
 ## Our methods
 
+### RetroMotion: Retrocausal Motion Forecasting Models are Instructable
+
+![RetroMotion](figures/retro_motion.png "RetroMotion")
+
+**From marginal to joint trajectories.** We use an MLP to generate query matrices $\bm{Q}$ from marginal trajectories and exchange information between queries and scene context with attention mechanisms Afterwards, we decode joint trajectories $\mathcal{P}^{\text{joint}}_{1:T}$ from pairs of queries at the same index. This compresses information from all $K^2$ possible combinations into $K$ query pairs.
+
+<details>
+<summary><big><b>More details</b></big></summary>
+
+The model definition is in `future_motion/models/ac_retro_motion.py`. The base config for the Waymo Open dataset is in `future_motion/configs/model/ac_retro_motion.yaml`. For our SMoE model, the ped expert is trained using the base config. For the veh expert change `model.motion_decoder.n_pred: 18`, `post_processing.waymo.topk_after_mpa_nms: True` and `post_processing.waymo.topk_aggregate_conf: True`.For the cyc expert change `train_metric.w_pos: [1, 1, 10]`, `train_metric.w_conf: [1, 1, 10]` and `loss_weight_dbl_decoding: 2`.
+
+After training, download the best checkpoints from wandb and adapt the paths in `future_motion/configs/models/expert_models.yaml` to test the SMoE model.
+
+</details>
+
 ### RedMotion: Motion Prediction via Redundancy Reduction 
 
 ![RedMotion](figures/red_motion.png "RedMotion")
