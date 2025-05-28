@@ -38,6 +38,7 @@ class RetroMotion(nn.Module):
         latent_context_module: DictConfig,
         motion_decoder: DictConfig,
         add_context_pos_enc: bool = False,
+        n_target: int = 8,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -54,10 +55,9 @@ class RetroMotion(nn.Module):
         print(f"{add_context_pos_enc = }")
 
         if add_context_pos_enc:
-            n_targets = 8  # TODO: read from global config
             seq_len = (
                 reduction_decoder["n_descriptors"] + 2
-            ) * n_targets  # + 2 for pos & rot embs
+            ) * n_target  # + 2 for pos & rot embs
             self.context_pos_enc = get_pos_encoding(
                 seq_len=seq_len,
                 dim=hidden_dim,
@@ -996,7 +996,6 @@ class DualDecoder(nn.Module):
         if additive_decoding:
             pred_1 = pred_0[..., :2, :, :, :] + pred_1
 
-        # if return_last_hidden_state:
         return (
             conf_0,
             pred_0,
