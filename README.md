@@ -6,10 +6,11 @@ Common repo for our ongoing research on motion forecasting in self-driving vehic
 ## Table of contents
 - [Setup](#setup)
 - [Our methods](#our-methods)
-  * [RedMotion](#redmotion-motion-prediction-via-redundancy-reduction)
+  * [RetroMotion](#retromotion-retrocausal-motion-forecasting-models-are-instructable)
   * [Words in Motion](#words-in-motion-extracting-interpretable-control-vectors-for-motion-transformers)
   * [SceneMotion](#scenemotion-from-agent-centric-embeddings-to-scene-wide-forecasts)
   * [JointMotion](#jointmotion-joint-self-supervision-for-joint-motion-prediction)
+  * [RedMotion](#redmotion-motion-prediction-via-redundancy-reduction)
 - [Other methods](#other-methods)
   * [Wayformer](#wayformer-motion-forecasting-via-simple--efficient-attention-networks)
 
