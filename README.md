@@ -43,7 +43,7 @@ Prepare Waymo Open Motion and Argoverse 2 Forecasting datasets by following the 
 
 ![RetroMotion](figures/retro_motion.png "RetroMotion")
 
-**From marginal to joint trajectories.** We use an MLP to generate query matrices $Q$ from marginal trajectories and exchange information between queries and scene context with attention mechanisms Afterwards, we decode joint trajectories $\mathcal{P}^{\text{joint}}_{1:T}$ from pairs of queries at the same index. This compresses information from all $K^2$ possible combinations into $K$ query pairs.Furthermore, this includes a retrocausal flow of information from later points in marginal trajectories to earlier points in joint trajectories. Notably, this enables us to issue intructions by modifying marginal trajectories [(Wagner et al. 2025)](http://arxiv.org/abs/2505.20414).
+**From marginal to joint trajectories.** We use an MLP to generate query matrices $Q$ from marginal trajectories $\mathcal{P}^{\text{marginal}}_{1:T}$ and exchange information between queries and scene context with attention mechanisms Afterwards, we decode joint trajectories $\mathcal{P}^{\text{joint}}_{1:T}$ from pairs of queries at the same index. This compresses information from all $K^2$ possible combinations into $K$ query pairs.Furthermore, this includes a retrocausal flow of information from later points in marginal trajectories to earlier points in joint trajectories. Notably, this enables us to issue intructions by modifying marginal trajectories [(Wagner et al. 2025)](http://arxiv.org/abs/2505.20414).
 
 <details>
 <summary><big><b>More details</b></big></summary>
@@ -51,6 +51,8 @@ Prepare Waymo Open Motion and Argoverse 2 Forecasting datasets by following the 
 The model definition is in `future_motion/models/ac_retro_motion.py`. The base config for the Waymo Open dataset is in `future_motion/configs/model/ac_retro_motion.yaml`. For our SMoE model, the ped expert is trained using the base config. For the veh expert change `model.motion_decoder.n_pred: 18`, `post_processing.waymo.topk_after_mpa_nms: True` and `post_processing.waymo.topk_aggregate_conf: True`. For the cyc expert change `train_metric.w_pos: [1, 1, 10]`, `train_metric.w_conf: [1, 1, 10]` and `loss_weight_dbl_decoding: 2`.
 
 After training, download the best checkpoints from wandb and adapt the paths in `future_motion/configs/models/expert_models.yaml` to test the SMoE model.
+
+To issue a turn right instruction pass `edit_pred_0=True` to the forward method of RetroMotion. More types of instructions will be released soon.
 
 </details>
 
