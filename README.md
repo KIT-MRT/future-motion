@@ -6,10 +6,11 @@ Common repo for our ongoing research on motion forecasting in self-driving vehic
 ## Table of contents
 - [Setup](#setup)
 - [Our methods](#our-methods)
-  * [RedMotion](#redmotion-motion-prediction-via-redundancy-reduction)
+  * [RetroMotion](#retromotion-retrocausal-motion-forecasting-models-are-instructable)
   * [Words in Motion](#words-in-motion-extracting-interpretable-control-vectors-for-motion-transformers)
   * [SceneMotion](#scenemotion-from-agent-centric-embeddings-to-scene-wide-forecasts)
   * [JointMotion](#jointmotion-joint-self-supervision-for-joint-motion-prediction)
+  * [RedMotion](#redmotion-motion-prediction-via-redundancy-reduction)
 - [Other methods](#other-methods)
   * [Wayformer](#wayformer-motion-forecasting-via-simple--efficient-attention-networks)
 
@@ -68,24 +69,22 @@ To issue a turn right instruction pass `edit_pred_0=True` to the forward method 
 
 <big><b>Contributions</b></big>
 
-* We argue that, to fit control vectors, latent space regularities with separable features are necessary. We use linear probing and show that neural collapse toward interpretable features occurs in
-hidden states of recent motion transformers, indicating a structured latent space.
-* We fit control vectors using hidden states with opposing features. By modifying hidden states
-at inference, we show that control vectors describe functionally important directions. Similar
-to the vector arithmetic in _word2vec_, we obtain predictions consistent with the current driving
-environment.
-* We use sparse autoencoders to optimize our control vectors. Notably, enforcing sparsity leads to
-more linear changes in predictions when scaling control vectors. We use linearity measures to
-compare these results against a Koopman autoencoder and evaluate the effects of various layers
-and activation functions, including convolutional and MLPMixer layers.
+* We argue that, to fit control vectors, latent space regularities with separable features are necessary. We use linear probing and show that neural collapse toward interpretable features occurs in hidden states of recent motion transformers, indicating a structured latent space.
+* We fit control vectors using hidden states with opposing features. By modifying hidden states at inference, we show that control vectors describe functionally important directions. Similar to the vector arithmetic in _word2vec_, we obtain predictions consistent with the current driving environment.
+* We use sparse autoencoders to optimize our control vectors. Notably, enforcing sparsity leads to more linear changes in predictions when scaling control vectors. We use linearity measures to compare these results against a Koopman autoencoder and sparse autoencoders with various layers and activation functions, including convolutional and MLPMixer layers.
+
+
+<big><b>Walkthrough</b></big>
+
+To reproduce the results, run the notebooks under `future_motion/notebooks/words_in_motion`. It will download the [Waymo](https://drive.google.com/file/d/1FbMXOT5Upqhm51ZxPHVz6g64KK2Cgbc6) and [AV2F](https://colab.research.google.com/drive/1ItY9YWQAmpfwc8KTRp6oY9e4uUWKxZrX?usp=sharing) embeddings and guide you through extracting and applying control vectors. 
 
 
 <big><b>Gradio demos</b></big>
 
 Use [this Colab notebook](https://colab.research.google.com/drive/1ItY9YWQAmpfwc8KTRp6oY9e4uUWKxZrX?usp=sharing) to start Gradio demos for our speed control vectors.
 
-In contrast to the qualitative results in our paper, we show the motion forecasts for the focal agent and 8 other agents in a scene. 
-Press the submit button with the default temperature = 0 to visualize the default (non-controlled) forecasts, then change the temperature and resubmit to visualize the changes. 
+In addition to the qualitative results in our paper, we show the motion forecasts for the focal agent and 8 other agents in a scene. 
+Press the submit button with the default `temperature = 0` to visualize the default (non-controlled) forecasts, then change the temperature and resubmit to visualize the changes. 
 The example is from the Waymo Open dataset and shows motion forecasts for vehicles and a pedestrian (top center).
 
 For very low control temperatures (e.g, -100), almost all agents are becoming static.

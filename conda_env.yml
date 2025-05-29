@@ -386,3 +386,4 @@ dependencies:
     - wrapt==1.12.1
     - torch-dct==0.1.6
     - nc-toolbox @ git+https://github.com/felixsh/nc-toolbox
+    - gdown==5.2.0
