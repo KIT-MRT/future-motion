@@ -61,7 +61,7 @@ To issue a turn right instruction pass `edit_pred_0=True` to the forward method 
 
 ![Words in Motion](figures/words_in_motion.png "Words in Motion")
 
-**Words in Motion.** (a) We classify motion features in an interpretable way, as in natural language. (b) We measure the degree to which these interpretable features are embedded in the hidden states $H_{i,:}$ of transformer models with linear probes. Furthermore, we use our discrete features and sparse autoencoding to fit interpretable control vectors $V_{i,:}$ that allow for modifying motion forecasts at inference. The training of the sparse autoencoder is shown with red arrows ($\textcolor{#f1615c}{\rightarrow}$) and the fitting of control vectors with blue arrows ($\textcolor{#5eb8e7}{\rightarrow}$).
+**Words in Motion.** (a) We classify motion features in an interpretable way, as in natural language. (b) We measure the degree to which these interpretable features are embedded in the hidden states $H_{i,:}$ of transformer models with linear probes. Furthermore, we use our discrete features and sparse autoencoding to fit interpretable control vectors $V_{i,:}$ that allow for modifying motion forecasts at inference. The training of the sparse autoencoder is shown with red arrows (<a href="https://github.com/KIT-MRT/future-motion"><img src="https://latex.codecogs.com/svg.image?\dpi{110}\color%7Bred%7D%20%5Crightarrow" alt="red arrow" /></a>) and the fitting of control vectors with blue arrows (<a href="https://github.com/KIT-MRT/future-motion"><img src="https://latex.codecogs.com/svg.image?\dpi{110}\color%7Bcyan%7D%20%5Crightarrow" alt="blue arrow" /></a>).
 
 <details>
 <summary><big><b>More details</b></big></summary>
