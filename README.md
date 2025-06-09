@@ -73,6 +73,9 @@ To issue a turn right instruction pass `edit_pred_0=True` to the forward method 
 * We fit control vectors using hidden states with opposing features. By modifying hidden states at inference, we show that control vectors describe functionally important directions. Similar to the vector arithmetic in _word2vec_, we obtain predictions consistent with the current driving environment.
 * We use sparse autoencoders to optimize our control vectors. Notably, enforcing sparsity leads to more linear changes in predictions when scaling control vectors. We use linearity measures to compare these results against a Koopman autoencoder and sparse autoencoders with various layers and activation functions, including convolutional and MLPMixer layers.
 
+<big><b>Video Overview</b></big>
+
+For a quick walkthrough of our approach and demo, watch [this video ▶️](https://youtu.be/SO8DXN8ocdg).
 
 <big><b>Walkthrough</b></big>
 
