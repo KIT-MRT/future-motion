@@ -17,6 +17,7 @@ def plot_motion_forecasts(
     mode_setting="top",  # "top" or "all" or "custom"
     mode_idx=None,
     save_path="",
+    plot_tl=True,
 ):
     fig = plt.figure(figsize=(15, 15), dpi=80)
     ax = fig.add_subplot(projection="3d", computed_zorder=False)
@@ -142,6 +143,42 @@ def plot_motion_forecasts(
             else:
                 add_cube(bbox, ax, color="tab:grey", alpha=0.5)
 
+    # Plot traffic lights:
+    if plot_tl:
+        tl_pos, tl_state, tl_valid = (
+            batch["tl_stop/pos"][idx_batch],
+            batch["tl_stop/state"][idx_batch],
+            batch["tl_stop/valid"][idx_batch],
+        )
+
+        for tl in range(tl_pos.shape[1]):
+            if tl_valid[idx_t_now, tl]:
+
+                tl_x = float(tl_pos[idx_t_now, tl, 0])
+                tl_y = float(tl_pos[idx_t_now, tl, 1])
+                tl_z = 5.0
+
+                tl_radius = 1.0
+
+                if tl_state[idx_t_now, tl, 1]:
+                    color = "red"
+                elif tl_state[idx_t_now, tl, 2]:
+                    color = "yellow"
+                elif tl_state[idx_t_now, tl, 3]:
+                    color = "green"
+                else:
+                    continue
+
+                # draw tl as a colored sphere
+                add_sphere(
+                    center=(tl_x, tl_y, tl_z),
+                    radius=tl_radius,
+                    ax=ax,
+                    color=color,
+                    edgecolor=color,
+                    alpha=0.75
+                )
+
     ax.set_zlim(bottom=0, top=5)
     ax.set_aspect("equal")
     ax.set_axis_off()
@@ -247,6 +284,33 @@ def add_cube(cube_definition, ax, color="b", edgecolor="k", alpha=0.2):
     ax.add_collection3d(faces)
     # Plot the points themselves to force the scaling of the axes
     ax.scatter(points[:, 0], points[:, 1], points[:, 2], s=0)
+
+
+def add_sphere(center, radius, ax, color="white", edgecolor="k", alpha=1.0, res=16):
+    """
+    Draw a sphere.
+
+    center : (x, y, z)
+    radius : float
+    res    : sphere resolution
+    """
+    cx, cy, cz = center
+
+    u = np.linspace(0, 2 * np.pi, res)
+    v = np.linspace(0, np.pi, res)
+
+    x = cx + radius * np.outer(np.cos(u), np.sin(v))
+    y = cy + radius * np.outer(np.sin(u), np.sin(v))
+    z = cz + radius * np.outer(np.ones_like(u), np.cos(v))
+
+    ax.plot_surface(
+        x, y, z,
+        color=color,
+        edgecolor=edgecolor,
+        linewidth=0.3,
+        alpha=alpha,
+        shade=True
+    )
 
 
 car = np.array(
